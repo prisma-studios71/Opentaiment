@@ -107,10 +107,16 @@ Opentaiment/
 Propozycja: **GPL-3.0** (otwartość, forki muszą zostać otwarte) albo **Apache-2.0**
 (łatwiejsza współpraca z firmami). Do decyzji.
 
-## 9. Najbliższe kroki
+## 9. Kolejność prac
 
-1. Szkielet projektu Gradle z modułami z pkt 4
-2. Design system w `core/ui`
-3. `feature/media` + integracja z Android Auto (najszybszy efekt „wow” w aucie)
-4. Launcher head unit z ekranem głównym
-5. OBD-II
+Sprzęt: najpierw **tablet z Androidem** (tryb Head Unit), potem **auto z Android Auto**.
+
+1. ✅ Szkielet projektu Gradle (`app-headunit`, `core/ui`, `feature/media|weather|apps`)
+2. ✅ Design system w `core/ui`
+3. ✅ Launcher na tablet: zegar, pogoda, sterowanie muzyką, skróty, lista aplikacji
+4. ⏭️ Ustawienia Opentaiment (adres domowy/praca, wybór domyślnej nawigacji i playera, motyw)
+5. ⏭️ Moduły `app-phone` + `car`: Android Auto (media → POI → dashboard), test na DHU
+6. ⏭️ OBD-II (ELM327)
+
+Uwaga: obecnie DI jest ręczne (repozytoria tworzone w ViewModelu). Hilt wejdzie razem z `app-phone`,
+kiedy pojawi się drugi konsument tych samych repozytoriów.
