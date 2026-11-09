@@ -59,6 +59,7 @@ class TileEditorActions(
     val onMove: (String, Int) -> Unit,
     val onReset: () -> Unit,
     val onDone: () -> Unit,
+    val onEditWidgets: (() -> Unit)? = null,
 )
 
 @Composable
@@ -76,6 +77,12 @@ fun TileEditorScreen(
             Spacer(Modifier.width(8.dp))
             Text("Kafelki ekranu głównego", style = MaterialTheme.typography.headlineMedium)
             Spacer(Modifier.weight(1f))
+            actions.onEditWidgets?.let { onEditWidgets ->
+                OutlinedButton(onClick = onEditWidgets, modifier = Modifier.height(56.dp)) {
+                    Text("Widżety", style = MaterialTheme.typography.titleMedium)
+                }
+                Spacer(Modifier.width(12.dp))
+            }
             OutlinedButton(onClick = actions.onReset, modifier = Modifier.height(56.dp)) {
                 Icon(Icons.Rounded.RestartAlt, contentDescription = null)
                 Spacer(Modifier.width(8.dp))

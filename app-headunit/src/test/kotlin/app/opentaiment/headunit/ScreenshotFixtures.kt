@@ -28,7 +28,7 @@ import app.opentaiment.headunit.tiles.TileList
 /** Shared fake data for screenshot tests. Bitmaps must be created inside a test (after Paparazzi boots). */
 object Fixtures {
 
-    val homeActions = HomeActions({}, {}, {}, {}, {}, {}, {})
+    val homeActions = HomeActions(widgets = WidgetActions(), onEditTiles = {}, onEditWidgets = {})
 
     val connectActions = ObdConnectActions(
         pairedDevices = { emptyList() }, hasBluetoothPermission = { true },

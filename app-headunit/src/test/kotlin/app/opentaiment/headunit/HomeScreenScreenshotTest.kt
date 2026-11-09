@@ -17,6 +17,7 @@ import app.opentaiment.feature.media.NowPlaying
 import app.opentaiment.feature.weather.Weather
 import app.opentaiment.feature.weather.WeatherState
 import com.android.resources.ScreenOrientation
+import app.opentaiment.headunit.tiles.WidgetSlots
 import org.junit.Rule
 import org.junit.Test
 import java.time.LocalDateTime
@@ -80,10 +81,8 @@ class HomeScreenScreenshotTest {
 
     private fun home(weather: WeatherState, nowPlaying: NowPlaying?, hasAccess: Boolean) = render {
         HomeScreen(
-            now = evening,
-            weather = weather,
-            nowPlaying = nowPlaying,
-            hasMediaAccess = hasAccess,
+            widgets = WidgetSlots.DEFAULT,
+            data = WidgetData(evening, weather, nowPlaying, hasAccess),
             tiles = Fixtures.tiles(),
             actions = Fixtures.homeActions,
             modifier = Modifier.fillMaxSize().padding(20.dp),

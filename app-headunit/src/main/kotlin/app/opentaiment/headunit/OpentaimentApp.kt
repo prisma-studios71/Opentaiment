@@ -39,6 +39,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -63,12 +64,15 @@ import app.opentaiment.headunit.tiles.TileEditorActions
 import app.opentaiment.headunit.tiles.TileEditorScreen
 import app.opentaiment.headunit.tiles.TileIds
 import app.opentaiment.headunit.tiles.TileOption
+import app.opentaiment.headunit.tiles.WidgetEditorActions
+import app.opentaiment.headunit.tiles.WidgetEditorScreen
 
-private enum class Screen { Home, Apps, Drive, Stats, Diagnostics, Trips, Race, Settings, EditTiles }
+private enum class Screen { Home, Apps, Drive, Stats, Diagnostics, Trips, Race, Settings, EditTiles, EditWidgets }
 
 @Composable
 fun OpentaimentApp(viewModel: HomeViewModel, isDefaultHome: () -> Boolean) {
     var screen by rememberSaveable { mutableStateOf(Screen.Home) }
+    var editedSlot by rememberSaveable { mutableIntStateOf(0) }
 
     val locationPermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -94,6 +98,7 @@ fun OpentaimentApp(viewModel: HomeViewModel, isDefaultHome: () -> Boolean) {
     val vehicleProfile by viewModel.vehicleProfile.collectAsStateWithLifecycle()
     val diagnostics by viewModel.diagnostics.collectAsStateWithLifecycle()
     val tileIds by viewModel.tiles.collectAsStateWithLifecycle()
+    val widgets by viewModel.widgets.collectAsStateWithLifecycle()
     val trips by viewModel.trips.collectAsStateWithLifecycle()
     val race by viewModel.race.collectAsStateWithLifecycle()
     val appearance by viewModel.appearance.collectAsStateWithLifecycle()
@@ -118,10 +123,8 @@ fun OpentaimentApp(viewModel: HomeViewModel, isDefaultHome: () -> Boolean) {
             Screen.Home -> Column(content) {
                 AlertBanner(vehicleStats.alerts.takeIf { vehicleConnection is ConnectionState.Connected }.orEmpty(), Modifier.padding(bottom = 16.dp))
                 HomeScreen(
-                now = now,
-                weather = weather,
-                nowPlaying = nowPlaying,
-                hasMediaAccess = hasMediaAccess,
+                widgets = widgets,
+                data = WidgetData(now, weather, nowPlaying, hasMediaAccess, vehicleConnection, vehicleStats, diagnostics, trips),
                 tiles = homeTiles(
                     ids = tileIds,
                     apps = apps,
@@ -147,13 +150,23 @@ fun OpentaimentApp(viewModel: HomeViewModel, isDefaultHome: () -> Boolean) {
                     onApp = { viewModel.launch(it) },
                 ),
                 actions = HomeActions(
-                    onRefreshWeather = viewModel::refreshWeather,
-                    onGrantMediaAccess = viewModel::grantMediaAccess,
-                    onPlayPause = viewModel::playPause,
-                    onNext = viewModel::next,
-                    onPrevious = viewModel::previous,
-                    onOpenPlayer = viewModel::openPlayer,
+                    widgets = WidgetActions(
+                        onRefreshWeather = viewModel::refreshWeather,
+                        onGrantMediaAccess = viewModel::grantMediaAccess,
+                        onPlayPause = viewModel::playPause,
+                        onNext = viewModel::next,
+                        onPrevious = viewModel::previous,
+                        onOpenPlayer = viewModel::openPlayer,
+                        onOpenDrive = { screen = Screen.Drive },
+                        onOpenStats = { screen = Screen.Stats },
+                        onOpenDiagnostics = { screen = Screen.Diagnostics },
+                        onOpenTrips = { screen = Screen.Trips },
+                    ),
                     onEditTiles = { screen = Screen.EditTiles },
+                    onEditWidgets = { slot ->
+                        editedSlot = slot
+                        screen = Screen.EditWidgets
+                    },
                 ),
                 modifier = Modifier.weight(1f).fillMaxWidth(),
             )
@@ -188,6 +201,7 @@ fun OpentaimentApp(viewModel: HomeViewModel, isDefaultHome: () -> Boolean) {
                     Text("Tablet", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.height(12.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        OutlinedButton(onClick = { screen = Screen.EditWidgets }) { Text("Edytuj widżety") }
                         OutlinedButton(onClick = { screen = Screen.EditTiles }) { Text("Edytuj kafelki") }
                         OutlinedButton(onClick = { viewModel.openSettings() }) { Text("Ustawienia Androida") }
                     }
@@ -238,10 +252,23 @@ fun OpentaimentApp(viewModel: HomeViewModel, isDefaultHome: () -> Boolean) {
                         onMove = viewModel::moveTile,
                         onReset = viewModel::resetTiles,
                         onDone = { screen = Screen.Home },
+                        onEditWidgets = { screen = Screen.EditWidgets },
                     ),
                     modifier = content,
                 )
             }
+            Screen.EditWidgets -> WidgetEditorScreen(
+                widgets = widgets,
+                selectedSlot = editedSlot,
+                actions = WidgetEditorActions(
+                    onSelectSlot = { editedSlot = it },
+                    onPick = { viewModel.setWidget(editedSlot, it) },
+                    onReset = viewModel::resetWidgets,
+                    onEditTiles = { screen = Screen.EditTiles },
+                    onDone = { screen = Screen.Home },
+                ),
+                modifier = content,
+            )
         }
     }
 }

@@ -19,7 +19,9 @@ import app.opentaiment.feature.vehicle.race.RaceState
 import app.opentaiment.feature.vehicle.data.VehicleProfile
 import app.opentaiment.feature.vehicle.data.VehicleStats
 import app.opentaiment.feature.weather.WeatherRepository
+import app.opentaiment.headunit.tiles.HomeWidget
 import app.opentaiment.headunit.tiles.TilesStore
+import app.opentaiment.headunit.tiles.WidgetsStore
 import app.opentaiment.feature.weather.WeatherState
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -42,6 +44,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private val vehicle = VehicleHub.get(app)
     private val appearanceController = AppearanceController(app, viewModelScope)
     private val tilesStore = TilesStore(app)
+    private val widgetsStore = WidgetsStore(app)
 
     val now: StateFlow<LocalDateTime> = flow {
         while (true) {
@@ -69,6 +72,9 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Ids of tiles on the home screen, in display order. */
     val tiles: StateFlow<List<String>> = tilesStore.tiles
+
+    /** Widgets in the three home screen slots. */
+    val widgets: StateFlow<List<HomeWidget>> = widgetsStore.widgets
 
     private var weatherJob: Job? = null
 
@@ -144,6 +150,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     fun removeTile(id: String) = tilesStore.remove(id)
     fun moveTile(id: String, delta: Int) = tilesStore.move(id, delta)
     fun resetTiles() = tilesStore.reset()
+    fun setWidget(slot: Int, widget: HomeWidget) = widgetsStore.set(slot, widget)
+    fun resetWidgets() = widgetsStore.reset()
 
     // --- shortcuts ---
     fun launch(app: AppEntry) = appsRepo.launch(app.packageName)

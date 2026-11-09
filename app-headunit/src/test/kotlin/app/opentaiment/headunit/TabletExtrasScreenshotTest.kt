@@ -125,10 +125,13 @@ class TabletExtrasScreenshotTest {
         Column(pad) {
             AlertBanner(s.alerts, Modifier.padding(bottom = 16.dp))
             HomeScreen(
-                now = LocalDateTime.of(2026, 11, 9, 22, 14),
-                weather = WeatherState.Ready(Weather(1.2, 0, 6.0, -2.0, 5.0, false, "Warszawa")),
-                nowPlaying = null,
-                hasMediaAccess = true,
+                widgets = app.opentaiment.headunit.tiles.WidgetSlots.DEFAULT,
+                data = WidgetData(
+                    LocalDateTime.of(2026, 11, 9, 22, 14),
+                    WeatherState.Ready(Weather(1.2, 0, 6.0, -2.0, 5.0, false, "Warszawa")),
+                    nowPlaying = null,
+                    hasMediaAccess = true,
+                ),
                 tiles = Fixtures.tiles(connection = demo, stats = s, diagnostics = DiagnosticsState.Ready(DEMO_DTCS)),
                 actions = Fixtures.homeActions,
                 modifier = Modifier.weight(1f).fillMaxWidth(),

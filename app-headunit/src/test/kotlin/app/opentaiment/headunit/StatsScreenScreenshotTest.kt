@@ -23,6 +23,10 @@ import app.opentaiment.feature.weather.WeatherState
 import app.opentaiment.headunit.tiles.TileEditorActions
 import app.opentaiment.headunit.tiles.TileEditorScreen
 import app.opentaiment.headunit.tiles.TileIds
+import app.opentaiment.headunit.tiles.HomeWidget
+import app.opentaiment.headunit.tiles.WidgetEditorActions
+import app.opentaiment.headunit.tiles.WidgetEditorScreen
+import app.opentaiment.headunit.tiles.WidgetSlots
 import com.android.resources.ScreenOrientation
 import org.junit.Rule
 import org.junit.Test
@@ -106,10 +110,13 @@ class StatsScreenScreenshotTest {
     fun homeWithLiveObdAndCustomTiles() = paparazzi.render {
         val apps = Fixtures.fakeApps()
         HomeScreen(
-            now = LocalDateTime.of(2026, 11, 9, 18, 42),
-            weather = WeatherState.Ready(Weather(2.4, 3, 14.0, -1.0, 5.0, true, "Warszawa")),
-            nowPlaying = null,
-            hasMediaAccess = true,
+            widgets = WidgetSlots.DEFAULT,
+            data = WidgetData(
+                LocalDateTime.of(2026, 11, 9, 18, 42),
+                WeatherState.Ready(Weather(2.4, 3, 14.0, -1.0, 5.0, true, "Warszawa")),
+                nowPlaying = null,
+                hasMediaAccess = true,
+            ),
             tiles = Fixtures.tiles(
                 ids = listOf("nav", "music", "stats", "diag", TileIds.app("pkg.waze"), TileIds.app("pkg.spotify"), "apps"),
                 apps = apps,
@@ -127,5 +134,55 @@ class StatsScreenScreenshotTest {
         val ids = listOf("nav", "music", "stats", "diag", TileIds.app("pkg.spotify"), "apps")
         val (current, available) = tileOptions(ids, Fixtures.fakeApps())
         TileEditorScreen(current, available, TileEditorActions({}, {}, { _, _ -> }, {}, {}), pad)
+    }
+
+    @Test
+    fun homeWithCarWidgets() = paparazzi.render {
+        val stats = drivenStats()
+        HomeScreen(
+            widgets = listOf(HomeWidget.SPEED, HomeWidget.ECO, HomeWidget.CONSUMPTION),
+            data = WidgetData(
+                LocalDateTime.of(2026, 11, 9, 18, 42),
+                WeatherState.Ready(Weather(2.4, 3, 14.0, -1.0, 5.0, true, "Warszawa")),
+                nowPlaying = null,
+                hasMediaAccess = true,
+                connection = demo,
+                stats = stats,
+                diagnostics = DiagnosticsState.Ready(DEMO_DTCS),
+            ),
+            tiles = Fixtures.tiles(connection = demo, stats = stats, diagnostics = DiagnosticsState.Ready(DEMO_DTCS)),
+            actions = Fixtures.homeActions,
+            modifier = pad,
+        )
+    }
+
+    @Test
+    fun homeWithTripAndDiagnosticWidgets() = paparazzi.render {
+        val stats = drivenStats()
+        HomeScreen(
+            widgets = listOf(HomeWidget.CLOCK, HomeWidget.DIAGNOSTICS, HomeWidget.TRIP),
+            data = WidgetData(
+                LocalDateTime.of(2026, 11, 9, 18, 42),
+                WeatherState.Loading,
+                nowPlaying = null,
+                hasMediaAccess = true,
+                connection = demo,
+                stats = stats,
+                diagnostics = DiagnosticsState.Ready(DEMO_DTCS),
+            ),
+            tiles = Fixtures.tiles(connection = demo, stats = stats),
+            actions = Fixtures.homeActions,
+            modifier = pad,
+        )
+    }
+
+    @Test
+    fun widgetEditor() = paparazzi.render {
+        WidgetEditorScreen(
+            widgets = listOf(HomeWidget.CLOCK, HomeWidget.ECO, HomeWidget.MUSIC),
+            selectedSlot = 1,
+            actions = WidgetEditorActions({}, {}, {}, {}, {}),
+            modifier = pad,
+        )
     }
 }

@@ -22,24 +22,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.opentaiment.core.ui.ActionTile
-import app.opentaiment.core.ui.OtCard
 import app.opentaiment.core.ui.TileIcon
-import app.opentaiment.feature.media.MediaPanel
-import app.opentaiment.feature.media.NowPlaying
-import app.opentaiment.feature.weather.WeatherCard
-import app.opentaiment.feature.weather.WeatherState
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
-import java.util.Locale
+import app.opentaiment.headunit.tiles.HomeWidget
+import app.opentaiment.headunit.tiles.WidgetSlots
+import androidx.compose.foundation.layout.padding
 
 class HomeActions(
-    val onRefreshWeather: () -> Unit,
-    val onGrantMediaAccess: () -> Unit,
-    val onPlayPause: () -> Unit,
-    val onNext: () -> Unit,
-    val onPrevious: () -> Unit,
-    val onOpenPlayer: () -> Unit,
+    val widgets: WidgetActions,
     val onEditTiles: () -> Unit,
+    /** Opens the widget editor with the given slot selected. */
+    val onEditWidgets: (slot: Int) -> Unit,
 )
 
 /** A tile ready to draw on the home screen. */
@@ -53,27 +45,28 @@ class HomeTile(
 
 private val gap = 20.dp
 
+/**
+ * Home screen: three widget slots (two small on the left, one large in the middle – see
+ * [WidgetSlots]) and the tile grid.
+ */
 @Composable
 fun HomeScreen(
-    now: LocalDateTime,
-    weather: WeatherState,
-    nowPlaying: NowPlaying?,
-    hasMediaAccess: Boolean,
+    widgets: List<HomeWidget>,
+    data: WidgetData,
     tiles: List<HomeTile>,
     actions: HomeActions,
     modifier: Modifier = Modifier,
 ) {
-    val media: @Composable (Modifier) -> Unit = { m ->
-        MediaPanel(
-            hasAccess = hasMediaAccess,
-            nowPlaying = nowPlaying,
-            onGrantAccess = actions.onGrantMediaAccess,
-            onPlayPause = actions.onPlayPause,
-            onNext = actions.onNext,
-            onPrevious = actions.onPrevious,
-            onOpenPlayer = actions.onOpenPlayer,
-            modifier = m,
-        )
+    val slot: @Composable (Int, Modifier) -> Unit = { index, m ->
+        Box(m) {
+            WidgetView(widgets.getOrElse(index) { WidgetSlots.DEFAULT[index] }, data, actions.widgets, Modifier.fillMaxSize())
+            // The first slot always carries the edit button, whatever widget sits there.
+            if (index == 0) {
+                IconButton(onClick = { actions.onEditWidgets(0) }, modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(56.dp)) {
+                    Icon(Icons.Rounded.Edit, contentDescription = "Edytuj ekran główny", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
     }
 
     BoxWithConstraints(modifier) {
@@ -81,50 +74,24 @@ fun HomeScreen(
             // Landscape – typical tablet on a dashboard mount.
             Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(gap)) {
                 Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(gap)) {
-                    ClockCard(now, actions.onEditTiles, Modifier.weight(1f).fillMaxWidth())
-                    WeatherCard(weather, actions.onRefreshWeather, Modifier.weight(1.2f).fillMaxWidth())
+                    slot(0, Modifier.weight(1f).fillMaxWidth())
+                    slot(1, Modifier.weight(1.2f).fillMaxWidth())
                 }
-                media(Modifier.weight(1.5f).fillMaxHeight())
+                slot(2, Modifier.weight(1.5f).fillMaxHeight())
                 TileGrid(tiles, columns = 2, onEdit = actions.onEditTiles, modifier = Modifier.weight(1f).fillMaxHeight())
             }
         } else {
             Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(gap)) {
                 Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(gap)) {
-                    ClockCard(now, actions.onEditTiles, Modifier.weight(1f).fillMaxHeight())
-                    WeatherCard(weather, actions.onRefreshWeather, Modifier.weight(1f).fillMaxHeight())
+                    slot(0, Modifier.weight(1f).fillMaxHeight())
+                    slot(1, Modifier.weight(1f).fillMaxHeight())
                 }
-                media(Modifier.weight(1.4f).fillMaxWidth())
+                slot(2, Modifier.weight(1.4f).fillMaxWidth())
                 TileGrid(
                     tiles,
                     columns = if (tiles.size <= 6) 3 else 4,
                     onEdit = actions.onEditTiles,
                     modifier = Modifier.weight(0.9f).fillMaxWidth(),
-                )
-            }
-        }
-    }
-}
-
-private val timeFormat = DateTimeFormatter.ofPattern("HH:mm")
-private val dateFormat = DateTimeFormatter.ofPattern("EEEE, d MMMM", Locale("pl"))
-
-@Composable
-private fun ClockCard(now: LocalDateTime, onEditTiles: () -> Unit, modifier: Modifier = Modifier) {
-    OtCard(modifier) {
-        Box(Modifier.fillMaxSize()) {
-            Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center) {
-                Text(now.format(timeFormat), style = MaterialTheme.typography.displayLarge, maxLines = 1)
-                Text(
-                    now.format(dateFormat).replaceFirstChar { it.titlecase(Locale("pl")) },
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                )
-            }
-            IconButton(onClick = onEditTiles, modifier = Modifier.align(Alignment.TopEnd).size(56.dp)) {
-                Icon(
-                    Icons.Rounded.Edit, contentDescription = "Edytuj kafelki",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
