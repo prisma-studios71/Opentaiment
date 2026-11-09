@@ -2,7 +2,11 @@ package app.opentaiment.headunit.tiles
 
 import android.content.Context
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.List
+import androidx.compose.material.icons.rounded.Android
 import androidx.compose.material.icons.rounded.Apps
+import androidx.compose.material.icons.rounded.DirectionsCar
+import androidx.compose.material.icons.rounded.Flag
 import androidx.compose.material.icons.rounded.Bluetooth
 import androidx.compose.material.icons.rounded.Build
 import androidx.compose.material.icons.rounded.MusicNote
@@ -20,11 +24,15 @@ import kotlinx.coroutines.flow.asStateFlow
 enum class BuiltinTile(val id: String, val label: String, val icon: ImageVector) {
     NAVIGATION("nav", "Nawigacja", Icons.Rounded.Navigation),
     MUSIC("music", "Muzyka", Icons.Rounded.MusicNote),
+    DRIVE("drive", "Jazda", Icons.Rounded.DirectionsCar),
     STATS("stats", "Statystyki", Icons.Rounded.Speed),
     DIAGNOSTICS("diag", "Diagnostyka", Icons.Rounded.Build),
+    TRIPS("trips", "Trasy", Icons.AutoMirrored.Rounded.List),
+    RACE("race", "Wyścig", Icons.Rounded.Flag),
     APPS("apps", "Aplikacje", Icons.Rounded.Apps),
     BLUETOOTH("bt", "Bluetooth", Icons.Rounded.Bluetooth),
     SETTINGS("settings", "Ustawienia", Icons.Rounded.Settings),
+    ANDROID_SETTINGS("android", "Android", Icons.Rounded.Android),
     PHONE("phone", "Telefon", Icons.Rounded.Phone),
     ;
 
@@ -44,8 +52,8 @@ object TileList {
     const val MAX_TILES = 8
 
     val DEFAULT: List<String> = listOf(
-        BuiltinTile.NAVIGATION, BuiltinTile.MUSIC, BuiltinTile.STATS,
-        BuiltinTile.DIAGNOSTICS, BuiltinTile.APPS, BuiltinTile.SETTINGS,
+        BuiltinTile.NAVIGATION, BuiltinTile.MUSIC, BuiltinTile.DRIVE, BuiltinTile.STATS,
+        BuiltinTile.DIAGNOSTICS, BuiltinTile.TRIPS, BuiltinTile.APPS, BuiltinTile.SETTINGS,
     ).map { it.id }
 
     fun add(tiles: List<String>, id: String): List<String> =

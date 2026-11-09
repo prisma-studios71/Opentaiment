@@ -55,9 +55,13 @@ import app.opentaiment.feature.vehicle.DiagnosticsState
 import app.opentaiment.feature.vehicle.data.DtcDictionary
 import app.opentaiment.feature.vehicle.data.DtcKind
 import app.opentaiment.feature.vehicle.data.DtcReport
+import app.opentaiment.feature.vehicle.data.dtcCountLabel
+import app.opentaiment.feature.vehicle.data.FreezeFrame
+import app.opentaiment.feature.vehicle.data.Readiness
+import app.opentaiment.feature.vehicle.obd.ObdPid
 
 class DiagnosticsActions(
-    val onBack: () -> Unit,
+    val onBack: (() -> Unit)?,
     val connect: ObdConnectActions,
     val onRead: () -> Unit,
     val onClear: () -> Unit,
@@ -65,7 +69,7 @@ class DiagnosticsActions(
 )
 
 private val gap = 20.dp
-private val OkGreen = Color(0xFF66BB6A)
+private val OkGreen = ConnectedGreen
 
 @Composable
 fun DiagnosticsScreen(
@@ -79,20 +83,10 @@ fun DiagnosticsScreen(
     val connected = connection is ConnectionState.Connected
 
     Column(modifier) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = actions.onBack, modifier = Modifier.size(72.dp)) {
-                Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Wróć", Modifier.size(40.dp))
-            }
-            Spacer(Modifier.width(8.dp))
-            Text("Diagnostyka", style = MaterialTheme.typography.headlineMedium)
-            Spacer(Modifier.width(20.dp))
-            StatusChip(connection)
-            Spacer(Modifier.weight(1f))
+        ScreenHeader("Diagnostyka", connection, actions.onBack) {
             if (connected) {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    HeaderButton(Icons.Rounded.DeleteSweep, "Skasuj błędy", { confirmClear = true })
-                    HeaderButton(Icons.Rounded.Refresh, "Odczytaj", actions.onRead, primary = true)
-                }
+                HeaderButton(Icons.Rounded.DeleteSweep, "Skasuj błędy", { confirmClear = true })
+                HeaderButton(Icons.Rounded.Refresh, "Odczytaj", actions.onRead, primary = true)
             }
         }
         Spacer(Modifier.height(16.dp))
@@ -139,8 +133,11 @@ private fun DiagnosticsBody(state: DiagnosticsState, actions: DiagnosticsActions
     val busy = state == DiagnosticsState.Reading || state == DiagnosticsState.Clearing
 
     BoxWithConstraints(modifier) {
-        val landscape = maxWidth >= maxHeight
-        val summary: @Composable (Modifier) -> Unit = { m -> SummaryCard(state, report, busy, actions.onRead, compact = !landscape, modifier = m) }
+        val landscape = maxWidth >= maxHeight && maxWidth >= NarrowWidth
+        val narrow = maxWidth < NarrowWidth
+        val summary: @Composable (Modifier) -> Unit = { m ->
+            SummaryCard(state, report, busy, actions.onRead, compact = !landscape, narrow = narrow, modifier = m)
+        }
         val codes: @Composable (Modifier) -> Unit = { m -> CodesList(report, busy, actions.onSearchCode, m) }
         if (landscape) {
             Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(gap)) {
@@ -149,7 +146,7 @@ private fun DiagnosticsBody(state: DiagnosticsState, actions: DiagnosticsActions
             }
         } else {
             Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(gap)) {
-                summary(Modifier.fillMaxWidth().height(220.dp))
+                summary(Modifier.fillMaxWidth().height(if (narrow) 250.dp else 220.dp))
                 codes(Modifier.fillMaxWidth().weight(1f))
             }
         }
@@ -163,10 +160,11 @@ private fun SummaryCard(
     busy: Boolean,
     onRead: () -> Unit,
     compact: Boolean,
+    narrow: Boolean,
     modifier: Modifier = Modifier,
 ) {
     if (compact && !busy && report != null && state !is DiagnosticsState.Failed) {
-        CompactSummary(report, modifier)
+        CompactSummary(report, narrow, modifier)
         return
     }
     OtCard(modifier) {
@@ -229,7 +227,28 @@ private fun SummaryCard(
 }
 
 @Composable
-private fun CompactSummary(report: DtcReport, modifier: Modifier = Modifier) {
+private fun CompactSummary(report: DtcReport, narrow: Boolean, modifier: Modifier = Modifier) {
+    if (narrow) {
+        OtCard(modifier) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                MilIcon(report, Modifier.size(56.dp))
+                Spacer(Modifier.width(14.dp))
+                Column {
+                    Text(milLabel(report.milOn), style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        if (report.totalCount == 0) "Brak błędów 🎉" else dtcCountLabel(report.totalCount),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            CountRow(DtcKind.STORED, report.stored.size)
+            CountRow(DtcKind.PENDING, report.pending.size)
+            CountRow(DtcKind.PERMANENT, report.permanent.size)
+        }
+        return
+    }
     OtCard(modifier) {
         Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
             MilIcon(report, Modifier.size(88.dp))
@@ -297,7 +316,8 @@ private fun CodesList(report: DtcReport?, busy: Boolean, onSearch: (String) -> U
             .filter { (_, codes) -> codes.isNotEmpty() }
     }.orEmpty()
 
-    if (sections.isEmpty()) {
+    val extras = report != null && (report.readiness != null || report.freezeFrame != null)
+    if (sections.isEmpty() && !extras) {
         OtCard(modifier) {
             Column(
                 Modifier.fillMaxSize(),
@@ -333,7 +353,97 @@ private fun CodesList(report: DtcReport?, busy: Boolean, onSearch: (String) -> U
             }
             items(codes, key = { "${kind.name}-$it" }) { code -> DtcItem(code, kind, onSearch) }
         }
+        if (sections.isEmpty()) {
+            item(key = "clean") {
+                Text(
+                    "Brak kodów błędów – żaden sterownik nie zgłasza usterek 🎉",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = ConnectedGreen,
+                )
+            }
+        }
+        report?.freezeFrame?.let { ff -> item(key = "freeze") { FreezeFrameCard(ff) } }
+        report?.readiness?.let { r -> item(key = "readiness") { ReadinessCard(r) } }
     }
+}
+
+@Composable
+private fun FreezeFrameCard(ff: FreezeFrame) {
+    OtCard(Modifier.fillMaxWidth()) {
+        Text("Zamrożone dane (freeze frame)", style = MaterialTheme.typography.titleLarge)
+        Text(
+            "Tak pracował silnik w chwili zapisania błędu ${ff.dtc} – bardzo przydatne dla mechanika.",
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(12.dp))
+        ff.values.entries.chunked(2).forEach { row ->
+            Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                row.forEach { (pid, value) ->
+                    Column(Modifier.weight(1f)) {
+                        Text(pidLabel(pid), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(pidValue(pid, value), style = MaterialTheme.typography.titleMedium)
+                    }
+                }
+                if (row.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReadinessCard(r: Readiness) {
+    OtCard(Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Gotowość do badania spalin", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+            Text(
+                if (r.ready) "✅ Gotowe" else "⏳ ${r.incomplete.size} w toku",
+                style = MaterialTheme.typography.titleMedium,
+                color = if (r.ready) ConnectedGreen else MaterialTheme.colorScheme.secondary,
+            )
+        }
+        Text(
+            if (r.ready) "Wszystkie testy samodiagnozy zakończone – auto jest gotowe na przegląd."
+            else "Część testów jeszcze trwa (np. po skasowaniu błędów lub odłączeniu akumulatora). " +
+                "Pojeźdź kilka dni w różnych warunkach, zanim pojedziesz na badanie.",
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(10.dp))
+        r.monitors.forEach { m ->
+            Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(m.name, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                Text(
+                    if (m.complete) "✅" else "⏳",
+                    style = MaterialTheme.typography.titleMedium,
+                )
+            }
+        }
+    }
+}
+
+private fun pidLabel(pid: ObdPid): String = when (pid) {
+    ObdPid.RPM -> "Obroty"
+    ObdPid.SPEED -> "Prędkość"
+    ObdPid.COOLANT_TEMP -> "Płyn chłodniczy"
+    ObdPid.ENGINE_LOAD -> "Obciążenie"
+    ObdPid.THROTTLE -> "Przepustnica"
+    ObdPid.SHORT_FUEL_TRIM -> "Korekta krótka"
+    ObdPid.LONG_FUEL_TRIM -> "Korekta długa"
+    ObdPid.INTAKE_MAP -> "Ciśnienie w kolektorze"
+    ObdPid.INTAKE_TEMP -> "Powietrze w dolocie"
+    ObdPid.MAF -> "Przepływ powietrza"
+    else -> pid.name
+}
+
+private fun pidValue(pid: ObdPid, v: Double): String = when (pid) {
+    ObdPid.RPM -> "${v.fmt()} obr/min"
+    ObdPid.SPEED -> "${v.fmt()} km/h"
+    ObdPid.COOLANT_TEMP, ObdPid.INTAKE_TEMP -> "${v.fmt()} °C"
+    ObdPid.SHORT_FUEL_TRIM, ObdPid.LONG_FUEL_TRIM -> "${if (v > 0) "+" else ""}${v.fmt(1)} %"
+    ObdPid.INTAKE_MAP -> "${v.fmt()} kPa"
+    ObdPid.MAF -> "${v.fmt(1)} g/s"
+    else -> "${v.fmt()} %"
 }
 
 @Composable
@@ -370,14 +480,4 @@ private fun DtcItem(code: String, kind: DtcKind, onSearch: (String) -> Unit) {
             }
         }
     }
-}
-
-/** Polish plural: 1 błąd, 2–4 błędy, 5+ błędów (but 12–14 błędów). */
-fun dtcCountLabel(count: Int): String {
-    val word = when {
-        count == 1 -> "błąd"
-        count % 10 in 2..4 && count % 100 !in 12..14 -> "błędy"
-        else -> "błędów"
-    }
-    return "$count $word"
 }

@@ -18,6 +18,8 @@ rootProject.name = "Opentaiment"
 
 include(
     ":app-headunit",
+    ":app-phone",
+    ":car",
     ":core:ui",
     ":feature:media",
     ":feature:weather",

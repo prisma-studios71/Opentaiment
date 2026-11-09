@@ -17,6 +17,9 @@ class TripCalculator(var profile: VehicleProfile = VehicleProfile()) {
     private val speedWindow = ArrayDeque<Pair<Long, Double>>()
     private val history = ArrayDeque<HistoryPoint>()
     private val sprints = listOf(SprintTimer(0, 100), SprintTimer(80, 120))
+    private val quarterMile = QuarterMileTimer()
+    private val eco = EcoScorer()
+    private val alerts = AlertMonitor()
 
     private var distanceM = 0.0
     private var fuelL = 0.0
@@ -64,8 +67,11 @@ class TripCalculator(var profile: VehicleProfile = VehicleProfile()) {
 
         if (speedKmh != null) {
             sprints.forEach { it.add(t, speedKmh) }
+            quarterMile.add(t, speedKmh)
             maxSpeed = max(maxSpeed, speedKmh)
         }
+        eco.add(dt, merged.speedKmh, merged.rpm, accel, profile.highRpmLimit)
+        val activeAlerts = alerts.update(merged)
         sample.rpm?.let { maxRpm = max(maxRpm, it) }
         powerKw?.let { peakPowerKw = max(peakPowerKw, it) }
         accel?.let { maxAccel = max(maxAccel, it) }
@@ -106,6 +112,9 @@ class TripCalculator(var profile: VehicleProfile = VehicleProfile()) {
             peakPowerKw = peakPowerKw,
             torqueNm = torque,
             sprints = sprints.map { it.state() },
+            quarterMile = quarterMile.state(),
+            eco = eco.result(),
+            alerts = activeAlerts,
             trip = TripStats(
                 distanceKm = distanceM / 1000,
                 durationMs = durationMs,
@@ -113,6 +122,7 @@ class TripCalculator(var profile: VehicleProfile = VehicleProfile()) {
                 maxSpeedKmh = maxSpeed,
                 maxRpm = maxRpm,
                 fuelUsedL = fuelL,
+                fuelCost = fuelL * profile.fuelPricePerL,
             ),
             history = history.toList(),
         )
@@ -130,11 +140,15 @@ class TripCalculator(var profile: VehicleProfile = VehicleProfile()) {
         peakPowerKw = 0.0
         maxAccel = 0.0
         sprints.forEach { it.reset() }
+        quarterMile.reset()
+        eco.reset()
         current = current.copy(
             avgLPer100Km = null,
             maxAccelMs2 = 0.0,
             peakPowerKw = 0.0,
             sprints = sprints.map { it.state() },
+            quarterMile = quarterMile.state(),
+            eco = null,
             trip = TripStats(),
         )
     }

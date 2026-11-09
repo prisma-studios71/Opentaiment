@@ -30,4 +30,8 @@ dependencies {
     api(libs.compose.material3)
     api(libs.compose.material.icons.extended)
     debugApi(libs.compose.ui.tooling)
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.kotlinx.coroutines.android)
+
+    testImplementation(libs.junit)
 }

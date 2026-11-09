@@ -2,7 +2,7 @@ package app.opentaiment.feature.vehicle
 
 import app.opentaiment.feature.vehicle.data.DtcDictionary
 import app.opentaiment.feature.vehicle.obd.Elm327Parser
-import app.opentaiment.feature.vehicle.ui.dtcCountLabel
+import app.opentaiment.feature.vehicle.data.dtcCountLabel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

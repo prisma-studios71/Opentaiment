@@ -1,11 +1,20 @@
 package app.opentaiment.feature.vehicle.obd
 
 import app.opentaiment.feature.vehicle.data.DtcReport
+import app.opentaiment.feature.vehicle.data.FreezeFrame
+import app.opentaiment.feature.vehicle.data.Readiness
 import java.io.IOException
 import java.util.Locale
 
 /** High-level ELM327 protocol on top of an [ObdTransport]. */
 class Elm327(private val transport: ObdTransport) {
+
+    private companion object {
+        val FREEZE_FRAME_PIDS = listOf(
+            ObdPid.RPM, ObdPid.SPEED, ObdPid.COOLANT_TEMP, ObdPid.ENGINE_LOAD, ObdPid.THROTTLE,
+            ObdPid.SHORT_FUEL_TRIM, ObdPid.LONG_FUEL_TRIM, ObdPid.INTAKE_MAP, ObdPid.INTAKE_TEMP, ObdPid.MAF,
+        )
+    }
 
     suspend fun initialize() {
         transport.send("ATZ", 5_000) // reset
@@ -43,12 +52,28 @@ class Elm327(private val transport: ObdTransport) {
         val isCan = Elm327Parser.isCanProtocol(transport.send("ATDPN"))
         val status = Elm327Parser.mode01Data(transport.send("0101"), 0x01)
         fun codes(mode: Int, raw: String) = Elm327Parser.dtcs(raw, mode, isCan)
+        val stored = codes(0x03, transport.send("03", 8_000))
         return DtcReport(
             milOn = status?.firstOrNull()?.let { it and 0x80 != 0 },
-            stored = codes(0x03, transport.send("03", 8_000)),
+            stored = stored,
             pending = codes(0x07, transport.send("07", 8_000)),
             permanent = codes(0x0A, transport.send("0A", 8_000)),
+            freezeFrame = if (stored.isNotEmpty()) readFreezeFrame() else null,
+            readiness = status?.let(Readiness::decode),
         )
+    }
+
+    /** Mode 02 frame 0: which code triggered it, then a handful of values from that moment. */
+    suspend fun readFreezeFrame(): FreezeFrame? {
+        val dtcBytes = Elm327Parser.mode02Data(transport.send("020200"), 0x02) ?: return null
+        if (dtcBytes.size < 2 || (dtcBytes[0] == 0 && dtcBytes[1] == 0)) return null
+        val dtc = Elm327Parser.decodeDtc(String.format(Locale.US, "%02X%02X", dtcBytes[0], dtcBytes[1]))
+        val values = linkedMapOf<ObdPid, Double>()
+        for (pid in FREEZE_FRAME_PIDS) {
+            val cmd = String.format(Locale.US, "02%02X00", pid.code)
+            Elm327Parser.mode02Data(transport.send(cmd), pid.code)?.let(pid::decodeOrNull)?.let { values[pid] = it }
+        }
+        return FreezeFrame(dtc, values)
     }
 
     /** Mode 04: clears codes, turns Check Engine off and resets readiness monitors. */

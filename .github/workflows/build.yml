@@ -14,9 +14,15 @@ jobs:
           distribution: temurin
           java-version: 17
       - uses: gradle/actions/setup-gradle@v4
-      - name: Build, unit tests, screenshot verification
-        run: ./gradlew assembleDebug testDebugUnitTest :app-headunit:verifyPaparazziDebug
+      - name: Build, unit tests (logic + Android Auto screens), screenshot verification
+        run: >
+          ./gradlew assembleDebug testDebugUnitTest
+          :app-headunit:verifyPaparazziDebug :app-phone:verifyPaparazziDebug
       - uses: actions/upload-artifact@v4
         with:
-          name: opentaiment-headunit-debug
+          name: opentaiment-phone-debug
+          path: app-phone/build/outputs/apk/debug/*.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: opentaiment-tablet-debug
           path: app-headunit/build/outputs/apk/debug/*.apk

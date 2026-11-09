@@ -30,11 +30,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -81,7 +85,26 @@ fun NowPlayingCard(
     onOpenPlayer: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    OtCard(modifier, onClick = onOpenPlayer) {
+    // Swipe the card sideways to change track (like on a phone lock screen).
+    var drag by remember { mutableFloatStateOf(0f) }
+    val swipe = Modifier.pointerInput(onNext, onPrevious) {
+        val threshold = 80.dp.toPx()
+        detectHorizontalDragGestures(
+            onDragStart = { drag = 0f },
+            onDragEnd = {
+                when {
+                    drag <= -threshold -> onNext()
+                    drag >= threshold -> onPrevious()
+                }
+                drag = 0f
+            },
+            onDragCancel = { drag = 0f },
+        ) { change, amount ->
+            change.consume()
+            drag += amount
+        }
+    }
+    OtCard(modifier.then(swipe).graphicsLayer { translationX = drag / 3 }, onClick = onOpenPlayer) {
         // Artwork takes whatever height is left, but never more than it is wide.
         Box(
             Modifier.weight(1f).fillMaxWidth(),

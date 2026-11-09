@@ -2,6 +2,8 @@ package app.opentaiment.feature.vehicle.source
 
 import android.os.SystemClock
 import app.opentaiment.feature.vehicle.data.DtcReport
+import app.opentaiment.feature.vehicle.data.FreezeFrame
+import app.opentaiment.feature.vehicle.data.Readiness
 import app.opentaiment.feature.vehicle.data.ObdSample
 import app.opentaiment.feature.vehicle.obd.Elm327
 import app.opentaiment.feature.vehicle.obd.ObdPid
@@ -124,7 +126,14 @@ class SimulatedDataSource(private val stepMs: Long = 200) : VehicleDataSource {
                 handleRequest(
                     request,
                     read = { delay(800); codes }, // feels like talking to a real ECU
-                    clear = { delay(800); codes = DtcReport(milOn = false, emptyList(), emptyList(), emptyList()) },
+                    clear = {
+                        delay(800)
+                        // Like a real car: codes gone, but self-tests reset to "not ready".
+                        codes = DtcReport(
+                            milOn = false, emptyList(), emptyList(), emptyList(),
+                            readiness = Readiness.decode(intArrayOf(0x00, 0x07, 0xE5, 0xE5)),
+                        )
+                    },
                 )
             }
             val s = simulator.next(stepMs)
@@ -138,4 +147,13 @@ val DEMO_DTCS = DtcReport(
     stored = listOf("P0420", "P0301"),
     pending = listOf("P0171"),
     permanent = listOf("P0420"),
+    freezeFrame = FreezeFrame(
+        dtc = "P0301",
+        values = linkedMapOf(
+            ObdPid.RPM to 2350.0, ObdPid.SPEED to 54.0, ObdPid.COOLANT_TEMP to 88.0,
+            ObdPid.ENGINE_LOAD to 62.0, ObdPid.THROTTLE to 31.0, ObdPid.SHORT_FUEL_TRIM to 4.7,
+            ObdPid.LONG_FUEL_TRIM to 9.4, ObdPid.INTAKE_MAP to 68.0, ObdPid.INTAKE_TEMP to 21.0,
+        ),
+    ),
+    readiness = Readiness.decode(intArrayOf(0x83, 0x07, 0xE5, 0x05)),
 )

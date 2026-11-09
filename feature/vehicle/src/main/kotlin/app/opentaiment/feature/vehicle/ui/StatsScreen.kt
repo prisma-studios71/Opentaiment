@@ -52,7 +52,8 @@ import app.opentaiment.feature.vehicle.data.VehicleStats
 import kotlin.math.roundToInt
 
 class StatsActions(
-    val onBack: () -> Unit,
+    /** Null on the phone, where screens live in tabs and there is nothing to go back to. */
+    val onBack: (() -> Unit)?,
     val connect: ObdConnectActions,
     val onDisconnect: () -> Unit,
     val onResetTrip: () -> Unit,
@@ -73,9 +74,19 @@ fun StatsScreen(
     val onConnectClick = rememberObdConnector(actions.connect)
 
     Column(modifier) {
-        Header(connection, actions, onConnectClick, onProfile = { showProfile = true })
+        ScreenHeader("Statystyki", connection, actions.onBack) {
+            HeaderButton(Icons.Rounded.Tune, "Auto", { showProfile = true })
+            if (connection is ConnectionState.Connected) {
+                HeaderButton(Icons.Rounded.RestartAlt, "Nowa trasa", actions.onResetTrip)
+                HeaderButton(Icons.Rounded.LinkOff, "Rozłącz", actions.onDisconnect, primary = true)
+            } else {
+                HeaderButton(Icons.Rounded.PlayArrow, "Demo", actions.connect.onDemo)
+                HeaderButton(Icons.Rounded.Bluetooth, "Połącz OBD", onConnectClick, primary = true)
+            }
+        }
         Spacer(Modifier.height(16.dp))
         if (connection is ConnectionState.Connected && stats.hasData) {
+            AlertBanner(stats.alerts, Modifier.padding(bottom = 16.dp))
             Dashboard(stats, Modifier.fillMaxSize())
         } else {
             ConnectPrompt(connection, onConnectClick, actions.connect.onDemo, Modifier.fillMaxSize())
@@ -95,99 +106,35 @@ fun StatsScreen(
 }
 
 @Composable
-private fun Header(
-    connection: ConnectionState,
-    actions: StatsActions,
-    onConnect: () -> Unit,
-    onProfile: () -> Unit,
-) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        IconButton(onClick = actions.onBack, modifier = Modifier.size(72.dp)) {
-            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Wróć", Modifier.size(40.dp))
-        }
-        Spacer(Modifier.width(8.dp))
-        Text("Statystyki", style = MaterialTheme.typography.headlineMedium)
-        Spacer(Modifier.width(20.dp))
-        StatusChip(connection)
-        Spacer(Modifier.weight(1f))
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            HeaderButton(Icons.Rounded.Tune, "Auto", onProfile)
-            if (connection is ConnectionState.Connected) {
-                HeaderButton(Icons.Rounded.RestartAlt, "Nowa trasa", actions.onResetTrip)
-                HeaderButton(Icons.Rounded.LinkOff, "Rozłącz", actions.onDisconnect, primary = true)
-            } else {
-                HeaderButton(Icons.Rounded.PlayArrow, "Demo", actions.connect.onDemo)
-                HeaderButton(Icons.Rounded.Bluetooth, "Połącz OBD", onConnect, primary = true)
-            }
-        }
-    }
-}
-
-@Composable
-internal fun HeaderButton(icon: ImageVector, label: String, onClick: () -> Unit, primary: Boolean = false) {
-    val content: @Composable () -> Unit = {
-        Icon(icon, contentDescription = null)
-        Spacer(Modifier.width(8.dp))
-        Text(label, style = MaterialTheme.typography.titleMedium)
-    }
-    if (primary) {
-        Button(onClick = onClick, modifier = Modifier.height(56.dp)) { content() }
-    } else {
-        OutlinedButton(onClick = onClick, modifier = Modifier.height(56.dp)) { content() }
-    }
-}
-
-@Composable
-internal fun StatusChip(connection: ConnectionState) {
-    val (color, text) = when (connection) {
-        ConnectionState.Disconnected -> MaterialTheme.colorScheme.onSurfaceVariant to "Niepołączono"
-        is ConnectionState.Connecting -> MaterialTheme.colorScheme.secondary to "Łączę…"
-        is ConnectionState.Connected ->
-            (if (connection.demo) MaterialTheme.colorScheme.secondary else Color(0xFF66BB6A)) to connection.deviceName
-        is ConnectionState.Failed -> MaterialTheme.colorScheme.error to "Błąd połączenia"
-    }
-    Row(
-        Modifier.clip(RoundedCornerShape(50))
-            .background(MaterialTheme.colorScheme.surface)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(Modifier.size(12.dp).clip(CircleShape).background(color))
-        Spacer(Modifier.width(10.dp))
-        Text(text, style = MaterialTheme.typography.titleMedium, maxLines = 1)
-    }
-}
-
-@Composable
 private fun Dashboard(stats: VehicleStats, modifier: Modifier = Modifier) {
     BoxWithConstraints(modifier) {
-        if (maxWidth >= maxHeight) {
-            Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(gap)) {
-                Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(gap)) {
-                    SpeedCard(stats, Modifier.weight(1.25f).fillMaxWidth())
-                    ConsumptionCard(stats, Modifier.weight(1f).fillMaxWidth())
-                }
-                Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(gap)) {
-                    PerformanceCard(stats, Modifier.weight(1.25f).fillMaxWidth())
-                    SprintCard(stats, Modifier.weight(1f).fillMaxWidth())
-                }
-                Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(gap)) {
-                    EngineCard(stats, Modifier.weight(1.1f).fillMaxWidth())
-                    TripCard(stats, Modifier.weight(1f).fillMaxWidth())
-                }
-            }
-        } else {
-            Column(
+        val cards: List<@Composable (Modifier) -> Unit> = listOf(
+            { m -> SpeedCard(stats, m) }, { m -> ConsumptionCard(stats, m) },
+            { m -> PerformanceCard(stats, m) }, { m -> SprintCard(stats, m) },
+            { m -> EngineCard(stats, m) }, { m -> TripCard(stats, m) },
+        )
+        when {
+            maxWidth < NarrowWidth -> Column(
+                // Phone: one card per row.
                 Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(gap),
             ) {
-                val pairs: List<Pair<@Composable (Modifier) -> Unit, @Composable (Modifier) -> Unit>> = listOf(
-                    Pair({ m -> SpeedCard(stats, m) }, { m -> ConsumptionCard(stats, m) }),
-                    Pair({ m -> PerformanceCard(stats, m) }, { m -> SprintCard(stats, m) }),
-                    Pair({ m -> EngineCard(stats, m) }, { m -> TripCard(stats, m) }),
-                )
-                pairs.forEach { (left, right) ->
-                    Row(Modifier.fillMaxWidth().height(400.dp), horizontalArrangement = Arrangement.spacedBy(gap)) {
+                cards.forEach { card -> card(Modifier.fillMaxWidth().height(380.dp)) }
+            }
+            maxWidth >= maxHeight -> Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(gap)) {
+                cards.chunked(2).forEach { (top, bottom) ->
+                    Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(gap)) {
+                        top(Modifier.weight(1.2f).fillMaxWidth())
+                        bottom(Modifier.weight(1f).fillMaxWidth())
+                    }
+                }
+            }
+            else -> Column(
+                Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(gap),
+            ) {
+                cards.chunked(2).forEach { (left, right) ->
+                    Row(Modifier.fillMaxWidth().height(420.dp), horizontalArrangement = Arrangement.spacedBy(gap)) {
                         left(Modifier.weight(1f).fillMaxHeight())
                         right(Modifier.weight(1f).fillMaxHeight())
                     }
@@ -204,39 +151,7 @@ private fun ProfileDialog(profile: VehicleProfile, onSave: (VehicleProfile) -> U
         onDismissRequest = onDismiss,
         title = { Text("Twoje auto") },
         text = {
-            Column {
-                Text("Paliwo", style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FuelType.entries.forEach { fuel ->
-                        if (fuel == draft.fuelType) {
-                            Button(onClick = {}) { Text(fuel.label) }
-                        } else {
-                            OutlinedButton(onClick = { draft = draft.copy(fuelType = fuel) }) { Text(fuel.label) }
-                        }
-                    }
-                }
-                Spacer(Modifier.height(20.dp))
-                Text("Masa auta z kierowcą: ${draft.massKg.roundToInt()} kg", style = MaterialTheme.typography.titleMedium)
-                Slider(
-                    value = draft.massKg.toFloat(),
-                    onValueChange = { draft = draft.copy(massKg = (it / 50).roundToInt() * 50.0) },
-                    valueRange = 800f..3000f,
-                    steps = 43,
-                )
-                Text("Pojemność silnika: ${draft.displacementL.fmt(1)} l", style = MaterialTheme.typography.titleMedium)
-                Slider(
-                    value = draft.displacementL.toFloat(),
-                    onValueChange = { draft = draft.copy(displacementL = (it * 10).roundToInt() / 10.0) },
-                    valueRange = 0.8f..5.0f,
-                    steps = 41,
-                )
-                Text(
-                    "Masa jest potrzebna do wyliczenia mocy, pojemność – do spalania w autach bez czujnika MAF.",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            VehicleProfileEditor(draft, { draft = it }, Modifier.verticalScroll(rememberScrollState()))
         },
         confirmButton = { TextButton(onClick = { onSave(draft) }) { Text("Zapisz") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Anuluj") } },

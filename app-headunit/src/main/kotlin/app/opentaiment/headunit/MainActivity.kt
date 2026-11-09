@@ -11,7 +11,11 @@ import androidx.activity.viewModels
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.opentaiment.core.ui.OpentaimentTheme
+import app.opentaiment.core.ui.applyNightBrightness
 
 class MainActivity : ComponentActivity() {
 
@@ -25,7 +29,9 @@ class MainActivity : ComponentActivity() {
         hideSystemBars()
 
         setContent {
-            OpentaimentTheme {
+            val look by viewModel.appearance.collectAsStateWithLifecycle()
+            LaunchedEffect(look) { applyNightBrightness(window, look) }
+            OpentaimentTheme(accent = look.settings.accent, night = look.isNight) {
                 OpentaimentApp(viewModel = viewModel, isDefaultHome = ::isDefaultHome)
             }
         }

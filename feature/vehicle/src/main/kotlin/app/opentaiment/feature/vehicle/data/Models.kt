@@ -54,7 +54,12 @@ data class VehicleProfile(
     val rollingResistance: Double = 0.012,
     val drivetrainEfficiency: Double = 0.85,
     val volumetricEfficiency: Double = 0.85,
-)
+    /** Price per litre in PLN, for trip cost. */
+    val fuelPricePerL: Double = 6.5,
+) {
+    /** Above this, driving counts as "high revs" for the eco score. Diesels pull lower. */
+    val highRpmLimit: Double get() = if (fuelType == FuelType.DIESEL) 3000.0 else 3500.0
+}
 
 enum class FuelSource(val label: String) {
     FUEL_RATE("z komputera silnika"),
@@ -81,6 +86,7 @@ data class TripStats(
     val maxSpeedKmh: Double = 0.0,
     val maxRpm: Double = 0.0,
     val fuelUsedL: Double = 0.0,
+    val fuelCost: Double = 0.0,
 ) {
     val avgSpeedKmh: Double?
         get() = if (movingMs > 0) distanceKm / (movingMs / 3_600_000.0) else null
@@ -110,6 +116,11 @@ data class VehicleStats(
     val peakPowerKw: Double = 0.0,
     val torqueNm: Double? = null,
     val sprints: List<SprintState> = emptyList(),
+    val quarterMile: QuarterMileState? = null,
+    val eco: EcoScore? = null,
+    val alerts: List<VehicleAlert> = emptyList(),
     val trip: TripStats = TripStats(),
     val history: List<HistoryPoint> = emptyList(),
-)
+) {
+    val best0to100Sec: Double? get() = sprints.firstOrNull { it.fromKmh == 0 && it.toKmh == 100 }?.bestSec
+}

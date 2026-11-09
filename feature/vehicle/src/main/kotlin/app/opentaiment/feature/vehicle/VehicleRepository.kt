@@ -11,15 +11,26 @@ import androidx.core.content.edit
 import app.opentaiment.feature.vehicle.data.DtcReport
 import app.opentaiment.feature.vehicle.data.FuelType
 import app.opentaiment.feature.vehicle.data.TripCalculator
+import app.opentaiment.feature.vehicle.data.TripHistoryStore
+import app.opentaiment.feature.vehicle.data.TripRecord
+import app.opentaiment.feature.vehicle.data.VehicleAlert
 import app.opentaiment.feature.vehicle.data.VehicleProfile
 import app.opentaiment.feature.vehicle.data.VehicleStats
 import app.opentaiment.feature.vehicle.obd.BluetoothObdTransport
+import app.opentaiment.feature.vehicle.race.GpsSource
+import app.opentaiment.feature.vehicle.race.RaceState
+import app.opentaiment.feature.vehicle.race.RaceTracker
 import app.opentaiment.feature.vehicle.source.ObdDataSource
 import app.opentaiment.feature.vehicle.source.ObdRequest
 import app.opentaiment.feature.vehicle.source.SimulatedDataSource
 import app.opentaiment.feature.vehicle.source.VehicleDataSource
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.channels.Channel
@@ -55,7 +66,23 @@ sealed interface DiagnosticsState {
 }
 
 /**
- * Owns the OBD connection (or the demo simulator) and the trip calculator.
+ * One connection to the car per app process, shared by the phone UI, Android Auto screens and
+ * the tablet launcher – they all just observe it.
+ */
+object VehicleHub {
+    @Volatile
+    private var instance: VehicleRepository? = null
+
+    fun get(context: Context): VehicleRepository = instance ?: synchronized(this) {
+        instance ?: VehicleRepository(
+            context.applicationContext,
+            CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate),
+        ).also { instance = it }
+    }
+}
+
+/**
+ * Owns the OBD connection (or the demo simulator), the trip calculator and the trip history.
  * Lives as long as [scope], so the trip keeps counting while other screens are open.
  */
 class VehicleRepository(context: Context, private val scope: CoroutineScope) {
@@ -76,8 +103,26 @@ class VehicleRepository(context: Context, private val scope: CoroutineScope) {
     private val _diagnostics = MutableStateFlow<DiagnosticsState>(DiagnosticsState.Idle)
     val diagnostics: StateFlow<DiagnosticsState> = _diagnostics.asStateFlow()
 
+    private val history = TripHistoryStore(java.io.File(appContext.filesDir, "trips.json"), scope)
+    /** Finished trips, newest first. */
+    val trips: StateFlow<List<TripRecord>> = history.trips
+
+    private val _newAlerts = MutableSharedFlow<VehicleAlert>(extraBufferCapacity = 8)
+    /** Fires once each time a new warning appears (overheating, no charging, low fuel…). */
+    val newAlerts: SharedFlow<VehicleAlert> = _newAlerts.asSharedFlow()
+
+    private val raceTracker = RaceTracker()
+    private val gps = GpsSource(appContext)
+    private var raceClock: Job? = null
+    private val _race = MutableStateFlow(RaceState())
+    /** Lap timer and g-meter (GPS). */
+    val race: StateFlow<RaceState> = _race.asStateFlow()
+
     private var job: Job? = null
     private var requests: Channel<ObdRequest>? = null
+    private var tripStartEpochMs: Long? = null
+    private var tripIsDemo = false
+    private var engineOffSinceMs: Long? = null
 
     fun hasBluetoothPermission(): Boolean =
         Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
@@ -106,16 +151,22 @@ class VehicleRepository(context: Context, private val scope: CoroutineScope) {
         start(device.name, demo = false, ObdDataSource({ BluetoothObdTransport.connect(appContext, device.address) }))
     }
 
+    /** The adapter used last time, if any. */
+    fun lastDevice(): ObdDevice? {
+        val address = prefs.getString(KEY_LAST_ADDRESS, null) ?: return null
+        return ObdDevice(prefs.getString(KEY_LAST_NAME, null) ?: address, address)
+    }
+
     /** Reconnects to the last used adapter – handy when the tablet boots with the car. */
     fun autoConnect() {
         if (job?.isActive == true || !hasBluetoothPermission()) return
-        val address = prefs.getString(KEY_LAST_ADDRESS, null) ?: return
-        connect(ObdDevice(prefs.getString(KEY_LAST_NAME, null) ?: address, address))
+        lastDevice()?.let(::connect)
     }
 
     fun startDemo() = start("Tryb demo", demo = true, SimulatedDataSource())
 
     fun disconnect() {
+        finishTrip()
         job?.cancel()
         job = null
         requests?.close()
@@ -172,7 +223,76 @@ class VehicleRepository(context: Context, private val scope: CoroutineScope) {
         else -> null
     }
 
+    /** "Nowa trasa": saves the current trip to history and starts counting from zero. */
     fun resetTrip() {
+        finishTrip()
+    }
+
+    // ---------- race mode (GPS) ----------
+
+    fun hasGpsPermission(): Boolean = gps.hasPermission()
+
+    /** Starts GPS for laps and the g-meter. Returns false without permission or with GPS off. */
+    fun startRaceGps(): Boolean {
+        val started = gps.start { fix ->
+            raceTracker.addFix(fix, obdAccelAvailable = _connection.value is ConnectionState.Connected)
+            _race.value = raceTracker.state
+        }
+        raceTracker.setGpsActive(started)
+        _race.value = raceTracker.state
+        if (started && raceClock?.isActive != true) {
+            raceClock = scope.launch {
+                while (true) {
+                    kotlinx.coroutines.delay(200)
+                    raceTracker.tick(GpsSource.now())
+                    _race.value = raceTracker.state
+                }
+            }
+        }
+        return started
+    }
+
+    fun stopRaceGps() {
+        gps.stop()
+        raceClock?.cancel()
+        raceTracker.setGpsActive(false)
+        _race.value = raceTracker.state
+    }
+
+    fun setFinishLineHere(): Boolean = raceTracker.setFinishLineHere().also { _race.value = raceTracker.state }
+
+    fun resetRace() {
+        raceTracker.resetLaps()
+        _race.value = raceTracker.state
+    }
+
+    fun deleteTrip(id: Long) = history.delete(id)
+    fun clearTrips() = history.clear()
+
+    /** Saves the trip in progress (if it is long enough to matter) and resets the counters. */
+    private fun finishTrip() {
+        val stats = calculator.current
+        val start = tripStartEpochMs
+        if (start != null && stats.trip.distanceKm >= MIN_TRIP_KM) {
+            history.add(
+                TripRecord(
+                    startEpochMs = start,
+                    endEpochMs = System.currentTimeMillis(),
+                    distanceKm = stats.trip.distanceKm,
+                    durationMs = stats.trip.durationMs,
+                    movingMs = stats.trip.movingMs,
+                    fuelUsedL = stats.trip.fuelUsedL,
+                    fuelPricePerL = calculator.profile.fuelPricePerL,
+                    maxSpeedKmh = stats.trip.maxSpeedKmh,
+                    ecoScore = stats.eco?.score,
+                    best0to100Sec = stats.best0to100Sec,
+                    quarterMileSec = stats.quarterMile?.bestSec,
+                    demo = tripIsDemo,
+                ),
+            )
+        }
+        tripStartEpochMs = null
+        engineOffSinceMs = null
         calculator.resetTrip()
         _stats.value = calculator.current
     }
@@ -184,10 +304,16 @@ class VehicleRepository(context: Context, private val scope: CoroutineScope) {
             putString(KEY_FUEL, profile.fuelType.name)
             putFloat(KEY_MASS, profile.massKg.toFloat())
             putFloat(KEY_DISPLACEMENT, profile.displacementL.toFloat())
+            putFloat(KEY_PRICE, profile.fuelPricePerL.toFloat())
         }
     }
 
-    private fun start(name: String, demo: Boolean, source: VehicleDataSource) {
+    /**
+     * Starts reading from any [source] – used by [connect] and [startDemo], and by tests or future
+     * transports (e.g. BLE adapters) that bring their own data source.
+     */
+    fun start(name: String, demo: Boolean, source: VehicleDataSource) {
+        finishTrip() // switching cars / to demo: keep what was driven so far
         job?.cancel()
         requests?.close()
         val channel = Channel<ObdRequest>(Channel.UNLIMITED)
@@ -201,16 +327,30 @@ class VehicleRepository(context: Context, private val scope: CoroutineScope) {
                     if (_connection.value !is ConnectionState.Connected) {
                         _connection.value = ConnectionState.Connected(name, demo)
                     }
-                    _stats.value = calculator.add(sample)
+                    if (tripStartEpochMs == null) {
+                        tripStartEpochMs = System.currentTimeMillis()
+                        tripIsDemo = demo
+                    }
+                    val previousAlerts = _stats.value.alerts.map { it.type }.toSet()
+                    val stats = calculator.add(sample)
+                    _stats.value = stats
+                    stats.accelMs2?.let {
+                        raceTracker.addObdAcceleration(it)
+                        _race.value = raceTracker.state
+                    }
+                    stats.alerts.filter { it.type !in previousAlerts }.forEach { _newAlerts.tryEmit(it) }
+                    splitTripWhenEngineOff(sample.timeMs, sample.rpm)
                     if (first) {
                         first = false
                         readDtcs() // check for trouble codes right away, so the home tile can warn
                     }
                 }
+                finishTrip()
                 _connection.value = ConnectionState.Disconnected
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
+                finishTrip()
                 _connection.value = ConnectionState.Failed(e.message ?: "Nie udało się połączyć z adapterem")
             } finally {
                 // Link is gone: nobody will answer queued requests any more.
@@ -218,6 +358,16 @@ class VehicleRepository(context: Context, private val scope: CoroutineScope) {
                 if (requests === channel) requests = null
             }
         }
+    }
+
+    /** A parked car with the adapter still powered: close the trip after a few minutes with the engine off. */
+    private fun splitTripWhenEngineOff(timeMs: Long, rpm: Double?) {
+        if (rpm != null && rpm >= 100) {
+            engineOffSinceMs = null
+            return
+        }
+        val since = engineOffSinceMs ?: timeMs.also { engineOffSinceMs = it }
+        if (timeMs - since >= ENGINE_OFF_SPLIT_MS && calculator.current.trip.distanceKm > 0) finishTrip()
     }
 
     private fun loadProfile(): VehicleProfile {
@@ -228,6 +378,7 @@ class VehicleRepository(context: Context, private val scope: CoroutineScope) {
                 ?: defaults.fuelType,
             massKg = prefs.getFloat(KEY_MASS, defaults.massKg.toFloat()).toDouble(),
             displacementL = prefs.getFloat(KEY_DISPLACEMENT, defaults.displacementL.toFloat()).toDouble(),
+            fuelPricePerL = prefs.getFloat(KEY_PRICE, defaults.fuelPricePerL.toFloat()).toDouble(),
         )
     }
 
@@ -237,6 +388,9 @@ class VehicleRepository(context: Context, private val scope: CoroutineScope) {
         const val KEY_FUEL = "fuel"
         const val KEY_MASS = "mass"
         const val KEY_DISPLACEMENT = "displacement"
+        const val KEY_PRICE = "fuel_price"
         const val DTC_TIMEOUT_MS = 30_000L
+        const val MIN_TRIP_KM = 0.2
+        const val ENGINE_OFF_SPLIT_MS = 3 * 60_000L
     }
 }

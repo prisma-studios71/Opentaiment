@@ -5,6 +5,8 @@ import java.util.Locale
 /** OBD-II mode 01 PIDs we use, with SAE J1979 decoding formulas (A, B = data bytes). */
 enum class ObdPid(val code: Int, private val bytes: Int, private val decode: (IntArray) -> Double) {
     ENGINE_LOAD(0x04, 1, { it[0] * 100.0 / 255 }),
+    SHORT_FUEL_TRIM(0x06, 1, { (it[0] - 128) * 100.0 / 128 }),
+    LONG_FUEL_TRIM(0x07, 1, { (it[0] - 128) * 100.0 / 128 }),
     COOLANT_TEMP(0x05, 1, { it[0] - 40.0 }),
     INTAKE_MAP(0x0B, 1, { it[0].toDouble() }),
     RPM(0x0C, 2, { (it[0] * 256 + it[1]) / 4.0 }),

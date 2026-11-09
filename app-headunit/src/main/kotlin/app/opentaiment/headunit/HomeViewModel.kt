@@ -10,7 +10,12 @@ import app.opentaiment.feature.media.NowPlaying
 import app.opentaiment.feature.vehicle.ConnectionState
 import app.opentaiment.feature.vehicle.DiagnosticsState
 import app.opentaiment.feature.vehicle.ObdDevice
-import app.opentaiment.feature.vehicle.VehicleRepository
+import app.opentaiment.core.ui.AppearanceController
+import app.opentaiment.core.ui.AppearanceSettings
+import app.opentaiment.core.ui.AppearanceState
+import app.opentaiment.feature.vehicle.VehicleHub
+import app.opentaiment.feature.vehicle.data.TripRecord
+import app.opentaiment.feature.vehicle.race.RaceState
 import app.opentaiment.feature.vehicle.data.VehicleProfile
 import app.opentaiment.feature.vehicle.data.VehicleStats
 import app.opentaiment.feature.weather.WeatherRepository
@@ -34,7 +39,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private val media = MediaRepository(app)
     private val weatherRepo = WeatherRepository(app)
     private val appsRepo = AppsRepository(app)
-    private val vehicle = VehicleRepository(app, viewModelScope)
+    private val vehicle = VehicleHub.get(app)
+    private val appearanceController = AppearanceController(app, viewModelScope)
     private val tilesStore = TilesStore(app)
 
     val now: StateFlow<LocalDateTime> = flow {
@@ -57,6 +63,9 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     val vehicleStats: StateFlow<VehicleStats> = vehicle.stats
     val vehicleProfile: StateFlow<VehicleProfile> = vehicle.profile
     val diagnostics: StateFlow<DiagnosticsState> = vehicle.diagnostics
+    val trips: StateFlow<List<TripRecord>> = vehicle.trips
+    val race: StateFlow<RaceState> = vehicle.race
+    val appearance: StateFlow<AppearanceState> = appearanceController.state
 
     /** Ids of tiles on the home screen, in display order. */
     val tiles: StateFlow<List<String>> = tilesStore.tiles
@@ -76,6 +85,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     fun onResume() {
         media.start()
+        appearanceController.refresh()
         reloadApps() // apps may have been installed/removed meanwhile
     }
 
@@ -120,6 +130,14 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     fun readDtcs() = vehicle.readDtcs()
     fun clearDtcs() = vehicle.clearDtcs()
     fun searchDtc(code: String) = appsRepo.openWebSearch("$code kod błędu OBD")
+    fun deleteTrip(id: Long) = vehicle.deleteTrip(id)
+    fun clearTrips() = vehicle.clearTrips()
+    fun hasGpsPermission() = vehicle.hasGpsPermission()
+    fun startRaceGps() { vehicle.startRaceGps() }
+    fun stopRaceGps() = vehicle.stopRaceGps()
+    fun setFinishLineHere() { vehicle.setFinishLineHere() }
+    fun resetRace() = vehicle.resetRace()
+    fun updateAppearance(settings: AppearanceSettings) = appearanceController.update(settings)
 
     // --- home tiles ---
     fun addTile(id: String) = tilesStore.add(id)
@@ -137,6 +155,6 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     override fun onCleared() {
         media.stop()
-        vehicle.disconnect()
+        // The OBD connection lives in VehicleHub and outlives this screen on purpose.
     }
 }

@@ -21,6 +21,20 @@ object Elm327Parser {
         return null
     }
 
+    /**
+     * Extracts freeze-frame data (mode 02) for [pid] in frame 0, e.g. "42 0C 00 1A F8" -> [0x1A, 0xF8].
+     */
+    fun mode02Data(raw: String, pid: Int): IntArray? {
+        val header = String.format(Locale.US, "42%02X", pid)
+        for (line in hexLines(raw)) {
+            if (!line.startsWith(header)) continue
+            val hex = line.substring(header.length + 2) // skip frame number
+            if (hex.length < 2) continue
+            return IntArray(hex.length / 2) { hex.substring(it * 2, it * 2 + 2).toInt(16) }
+        }
+        return null
+    }
+
     /** Decodes a "supported PIDs" bitmask (PID 00/20/40) into absolute PID numbers. */
     fun supportedPids(data: IntArray, base: Int): Set<Int> = buildSet {
         for (i in 0 until minOf(32, data.size * 8)) {

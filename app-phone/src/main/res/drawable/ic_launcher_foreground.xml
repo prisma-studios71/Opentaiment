@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Stylised steering wheel / "O" of Opentaiment on the 108dp adaptive-icon canvas. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FF4FC3F7"
+        android:strokeWidth="6"
+        android:pathData="M54,30 A24,24 0 1,1 53.99,30 Z" />
+    <path
+        android:fillColor="#FF4FC3F7"
+        android:pathData="M54,47 A7,7 0 1,1 53.99,47 Z" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FF4FC3F7"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:pathData="M32,52 L47,54 M76,52 L61,54 M54,61 L54,76" />
+</vector>

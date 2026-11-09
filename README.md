@@ -1,95 +1,119 @@
 # Opentaiment
 
-Otwarty system infotainment do samochodu dla Androida i Android Auto.
+**Dodatek do Android Auto**, który pokazuje to, czego Android Auto nie ma: dane z auta przez OBD-II.
+Spalanie, koszt jazdy, eco-score, moc, błędy silnika, historia tras i zabawki na tor – na telefonie
+i na ekranie auta. Muzyka i nawigacja zostają w Android Auto, tak jak zawsze.
 
-- 🚗 **Head unit / tablet** – pełnoekranowy launcher na tablet z Androidem (albo radio z Androidem). **← jesteśmy tutaj (v0.1)**
-- 📱 **Telefon + Android Auto** – moduły wyświetlane na ekranie auta przez Android Auto (następny etap).
+Bez reklam, bez kont, bez śledzenia – wszystko zostaje na telefonie.
 
-![Ekran główny](app-headunit/src/test/snapshots/images/app.opentaiment.headunit_HomeScreenScreenshotTest_homeLandscapePlaying.png)
+![Telefon – jazda](app-phone/src/test/snapshots/images/app.opentaiment.phone_PhoneScreenshotTest_drive.png)
+![Telefon – statystyki](app-phone/src/test/snapshots/images/app.opentaiment.phone_PhoneScreenshotTest_stats.png)
+![Telefon – błędy](app-phone/src/test/snapshots/images/app.opentaiment.phone_PhoneScreenshotTest_diagnostics.png)
+![Telefon – trasy](app-phone/src/test/snapshots/images/app.opentaiment.phone_PhoneScreenshotTest_trips.png)
 
-## Co już działa (v0.1 – tablet)
+## Jak to działa z Android Auto
 
-- Ekran główny: zegar, data, pogoda (Open-Meteo, bez klucza API, ostrzeżenie o śliskiej drodze)
-- Sterowanie muzyką z **dowolnej** aplikacji (Spotify, YouTube Music, Tidal, radio…): okładka, tytuł, postęp, play/pauza/następny/poprzedni
-- **Statystyki z OBD-II** (adapter ELM327 Bluetooth): spalanie chwilowe i średnie, moc i moment (szacowane), przyspieszenie, automatyczny pomiar 0–100 i 80–120 km/h z rekordami, temperatury, napięcie, poziom paliwa, licznik trasy, wykres ostatniej minuty. Jest **tryb demo** bez auta.
-- **Diagnostyka (kody błędów)**: stan Check Engine, błędy zapisane / oczekujące / stałe z opisami po polsku, wyszukiwanie kodu w internecie, kasowanie błędów (z ostrzeżeniem). Błędy są sprawdzane od razu po połączeniu z autem.
-- **Edytowalne kafelki**: wybierasz, co jest na ekranie głównym i w jakiej kolejności (do 8), także dowolne aplikacje. Edycja: ołówek na karcie zegara albo przytrzymanie kafelka.
-- Lista aplikacji z wyszukiwarką
-- Tryb launchera (można ustawić jako ekran główny), ekran nie gaśnie, ukryte paski systemowe
-- Układ poziomy i pionowy
+Android Auto nie pozwala żadnej aplikacji rysować po swoim ekranie. Opentaiment dostaje więc
+**własną ikonę w menu aplikacji Android Auto** i własne ekrany:
 
-## Statystyki (OBD-II)
+| Ekran w aucie | Co pokazuje |
+|---|---|
+| **Jazda** | prędkość, obroty, spalanie chwilowe i średnie, eco-score z podpowiedzią, koszt i dystans trasy, ostrzeżenia |
+| **Statystyki** | moc i moment, przyspieszenie, temperatury, akumulator, poziom paliwa, trasa |
+| **Diagnostyka** | Check Engine, kody błędów z opisami, gotowość do badania spalin, kasowanie błędów |
+| **Trasy** | podsumowanie tygodnia i miesiąca, ostatnie jazdy |
+| **Wyścig** | 0–100, 80–120, ¼ mili, okrążenia GPS, przeciążenia |
+| **Połączenie** | połącz z adapterem / tryb demo / rozłącz |
 
-![Statystyki](app-headunit/src/test/snapshots/images/app.opentaiment.headunit_StatsScreenScreenshotTest_statsDemoDriving.png)
+Ostrzeżenia (przegrzanie, brak ładowania, mało paliwa…) wyskakują jako alert na ekranie auta
+i powiadomienie na telefonie.
+
+> Ekrany Android Auto rysuje sam Android Auto z gotowych szablonów Google, więc wyglądają
+> „po androidowemu”, a nie jak na zrzutach z telefonu – i odświeżają się co sekundę.
+
+## Co potrzebujesz
+
+- Telefon z Androidem 8+ i auto z Android Auto (albo sam telefon w uchwycie)
+- **Adapter ELM327 na Bluetooth** („kostka OBD”, ~30–80 zł) w gnieździe OBD-II
+  (każda benzyna od 2001, diesel od 2004 w UE)
+
+## Instalacja
+
+1. Pobierz APK: **Actions → ostatni build → artefakt `opentaiment-phone-debug`**
+   albo zbuduj: `./gradlew :app-phone:assembleDebug`
+2. Zainstaluj na telefonie, wejdź w **Statystyki → Połącz OBD** i wybierz adapter
+   (najpierw sparuj go w ustawieniach Bluetooth, PIN zwykle 1234 lub 0000).
+   Bez auta? Kliknij **Demo**.
+3. **Włącz aplikacje spoza Sklepu Play w Android Auto** (jednorazowo):
+   Android Auto → Ustawienia → stuknij 10× w **„Wersja”** → menu **⋮** → **Ustawienia dla programistów**
+   → zaznacz **„Nieznane źródła”**.
+4. Podłącz telefon do auta – Opentaiment jest w menu aplikacji Android Auto.
+   Przy kolejnych jazdach łączy się z adapterem sam.
+
+W **Więcej → Ustawienia** ustaw cenę paliwa, rodzaj paliwa, masę i pojemność silnika –
+od tego zależą koszt, moc i spalanie.
+
+## Funkcje
+
+**Dane z auta (OBD-II)**
+- Spalanie chwilowe i średnie (z PID 5E, przepływomierza MAF albo ciśnienia MAP), wykrywa odcięcie paliwa przy hamowaniu silnikiem
+- **Koszt paliwa** każdej trasy i podsumowania tygodnia/miesiąca
+- **Eco-score 0–100** z podpowiedziami (gwałtowne ruszanie i hamowanie, wysokie obroty, postój na biegu jałowym)
+- **Historia tras** – zapisuje się sama (po rozłączeniu, „Nowej trasie” albo 3 min ze zgaszonym silnikiem)
+- **Alerty**: przegrzanie, za gorący olej, brak ładowania, za wysokie napięcie, słaby akumulator, mało paliwa
+- Moc, moment i przyspieszenie (szacowane z fizyki), temperatury, napięcie, wykres ostatniej minuty
+- **Błędy silnika**: zapisane / oczekujące / stałe, ~80 opisów po polsku, wyszukiwanie kodu, kasowanie
+- **Freeze frame** – parametry silnika z chwili wystąpienia błędu
+- **Gotowość do badania spalin** – czy auto przejdzie przegląd (benzyna i diesel)
+
+**Wyścig** (tylko na torze!)
+- 0–100 i 80–120 km/h, **¼ mili** z prędkością na mecie – mierzą się same
+- **Okrążenia GPS** – ustaw linię mety jednym kliknięciem
+- **G-meter** – przeciążenia w zakrętach (GPS), przy ruszaniu i hamowaniu (OBD)
+
+**Wygląd i wygoda**
+- **Automatyczny tryb nocny** – po zachodzie słońca (liczonym z Twojej lokalizacji) ekran robi się czerwono-czarny i ciemniejszy
+- **6 kolorów akcentu**
+- **Ekran „Jazda”** – jedna wielka liczba, kolejne strony przesuwasz palcem
+- Gesty: przesuwanie stron, przesunięcie karty muzyki zmienia utwór (tablet), przytrzymanie kafelka = edycja (tablet)
+
+| | | |
+|---|---|---|
+| ![Eco](app-phone/src/test/snapshots/images/app.opentaiment.phone_PhoneScreenshotTest_driveEco.png) | ![Noc](app-phone/src/test/snapshots/images/app.opentaiment.phone_PhoneScreenshotTest_driveNight.png) | ![Alert](app-phone/src/test/snapshots/images/app.opentaiment.phone_PhoneScreenshotTest_driveWithAlert.png) |
+| Eco-score i podpowiedź | Tryb nocny | Ostrzeżenie |
+| ![Wyścig](app-phone/src/test/snapshots/images/app.opentaiment.phone_PhoneScreenshotTest_race.png) | ![Ustawienia](app-phone/src/test/snapshots/images/app.opentaiment.phone_PhoneScreenshotTest_settingsGreen.png) | ![Więcej](app-phone/src/test/snapshots/images/app.opentaiment.phone_PhoneScreenshotTest_more.png) |
+| Wyścig | Ustawienia | Więcej |
+
+## Tryb dodatkowy: tablet albo radio z Androidem
+
+Dla aut bez Android Auto ten sam kod działa jako pełnoekranowy launcher na tablecie
+(`app-headunit`): zegar, pogoda, sterowanie muzyką z dowolnej apki, edytowalne kafelki
+i wszystkie ekrany OBD. APK: artefakt `opentaiment-tablet-debug`.
 
 | | |
 |---|---|
-| ![Bez połączenia](app-headunit/src/test/snapshots/images/app.opentaiment.headunit_StatsScreenScreenshotTest_statsNotConnected.png) | ![Kafelek](app-headunit/src/test/snapshots/images/app.opentaiment.headunit_StatsScreenScreenshotTest_homeWithLiveObdAndCustomTiles.png) |
-| Instrukcja podłączenia adaptera | Podczas jazdy kafelek na ekranie głównym pokazuje prędkość i spalanie |
+| ![Tablet](app-headunit/src/test/snapshots/images/app.opentaiment.headunit_HomeScreenScreenshotTest_homeLandscapePlaying.png) | ![Tablet nocą](app-headunit/src/test/snapshots/images/app.opentaiment.headunit_TabletExtrasScreenshotTest_homeNightWithAlert.png) |
+| ![Statystyki](app-headunit/src/test/snapshots/images/app.opentaiment.headunit_StatsScreenScreenshotTest_statsDemoDriving.png) | ![Trasy](app-headunit/src/test/snapshots/images/app.opentaiment.headunit_TabletExtrasScreenshotTest_trips.png) |
 
-**Co jest potrzebne:** adapter ELM327 na Bluetooth (tzw. „kostka OBD”, ~30–80 zł), wpięty w gniazdo OBD-II
-(każda benzyna od 2001 i diesel od 2004 w UE). Sparuj go w ustawieniach Bluetooth, potem *Statystyki → Połącz OBD*.
-Adapter jest zapamiętywany i przy następnym starcie aplikacja łączy się sama.
+## Uczciwie o ograniczeniach
 
-**Skąd biorą się liczby:**
+- **Moc i moment są szacowane** z prędkości, masy auta i oporów – zwykłe OBD ich nie podaje. Najdokładniej przy pełnym gazie na płaskim.
+- **Spalanie w dieslu bez PID 5E** liczone z przepływomierza jest zawyżone (diesel pracuje na ubogiej mieszance).
+- Zwykły ELM327 czyta **błędy silnika** ze standardowego OBD-II; ABS, poduszki czy klimatyzacja zwykle wymagają protokołów producenta.
+- Dystans ¼ mili liczony jest z prędkości z OBD (jak licznik w aucie), a przeciążenia boczne z GPS – to dobre przybliżenia, nie pomiar z toru.
+- Aplikacja nie jest w Sklepie Play, dlatego w Android Auto trzeba włączyć „Nieznane źródła”.
 
-| Wartość | Źródło |
-|---|---|
-| Spalanie | PID 5E (jeśli auto go ma) → przepływomierz MAF → ciśnienie w kolektorze MAP (z pojemności silnika). Wykrywa odcięcie paliwa przy hamowaniu silnikiem. |
-| Przyspieszenie | Regresja liniowa prędkości z ostatnich 1,5 s |
-| Moc, moment | Szacowane z fizyki: masa × przyspieszenie + opory toczenia + opór powietrza, ÷ sprawność układu napędowego. Najdokładniejsze przy pełnym gazie na płaskim. |
-| 0–100, 80–120 | Start/meta interpolowane między próbkami, przerywane gdy odpuścisz gaz |
-
-W *Statystyki → Auto* ustaw rodzaj paliwa, masę i pojemność silnika, bo bez tego moc i spalanie będą mniej dokładne.
-
-## Diagnostyka i kafelki
-
-| | |
-|---|---|
-| ![Diagnostyka](app-headunit/src/test/snapshots/images/app.opentaiment.headunit_StatsScreenScreenshotTest_diagnosticsWithCodes.png) | ![Edycja kafelków](app-headunit/src/test/snapshots/images/app.opentaiment.headunit_StatsScreenScreenshotTest_tileEditor.png) |
-| Kody błędów z opisami | Edycja kafelków |
-| ![Kafelki](app-headunit/src/test/snapshots/images/app.opentaiment.headunit_StatsScreenScreenshotTest_homeWithLiveObdAndCustomTiles.png) | ![Bez błędów](app-headunit/src/test/snapshots/images/app.opentaiment.headunit_StatsScreenScreenshotTest_diagnosticsClean.png) |
-| Własne kafelki (Waze, Spotify) + ostrzeżenie o błędach na kafelku | Auto bez błędów |
-
-Opisy po polsku ma ~80 najczęstszych kodów ogólnych (P0xxx, U0xxx). Pozostałe dostają opis kategorii,
-a kody producenta (P1xxx itp.) – informację, że znaczenie zależy od marki; lupa obok kodu wyszukuje go w sieci.
-Odczytywane są tylko błędy, które sterownik silnika udostępnia przez standardowe OBD-II –
-błędy ABS, poduszek czy klimatyzacji zwykle wymagają protokołów producenta.
-
-## Screeny (v0.1)
-
-| | |
-|---|---|
-| ![Gra muzyka](app-headunit/src/test/snapshots/images/app.opentaiment.headunit_HomeScreenScreenshotTest_homeLandscapePlaying.png) | ![Pauza, noc](app-headunit/src/test/snapshots/images/app.opentaiment.headunit_HomeScreenScreenshotTest_homeLandscapePaused.png) |
-| Gra muzyka, zimno → ostrzeżenie o śliskiej drodze | Pauza, wieczór, bezchmurnie |
-| ![Nic nie gra](app-headunit/src/test/snapshots/images/app.opentaiment.headunit_HomeScreenScreenshotTest_homeLandscapeNothingPlaying.png) | ![Brak dostępu](app-headunit/src/test/snapshots/images/app.opentaiment.headunit_HomeScreenScreenshotTest_homeLandscapeNoMediaAccess.png) |
-| Nic nie gra | Pierwsze uruchomienie – trzeba dać dostęp do muzyki |
-| ![Lista aplikacji](app-headunit/src/test/snapshots/images/app.opentaiment.headunit_HomeScreenScreenshotTest_appDrawer.png) | ![Pion](app-headunit/src/test/snapshots/images/app.opentaiment.headunit_HomeScreenScreenshotTest_homePortraitPlaying.png) |
-| Lista aplikacji z wyszukiwarką | Tablet w pionie |
-
-Screeny są generowane z kodu (Paparazzi, bez emulatora): `./gradlew :app-headunit:recordPaparazziDebug`
-
-## Instalacja na tablecie
-
-1. Pobierz APK z zakładki **Actions → ostatni build → artefakt `opentaiment-headunit-debug`**
-   albo zbuduj sam: `./gradlew :app-headunit:assembleDebug`
-   (plik: `app-headunit/build/outputs/apk/debug/app-headunit-debug.apk`).
-2. Zainstaluj (`adb install app-headunit-debug.apk` albo skopiuj plik na tablet i otwórz).
-3. Przy pierwszym uruchomieniu zezwól na lokalizację (pogoda dla Twojego miasta).
-4. Kliknij **„Otwórz ustawienia”** na karcie muzyki i włącz Opentaiment w *Dostęp do powiadomień* – bez tego Android nie pozwala sterować muzyką z innych aplikacji.
-5. (Opcjonalnie) Ustawienia → Aplikacje → Aplikacja domyślna → **Ekran główny → Opentaiment**, żeby tablet startował od razu w trybie auta.
-
-## Struktura
+## Dla programistów
 
 ```
-app-headunit/      launcher na tablet / head unit
-core/ui/           motyw i wspólne komponenty
-feature/media/     sterowanie sesjami mediów
-feature/weather/   pogoda (Open-Meteo)
-feature/apps/      lista aplikacji i skróty
-feature/vehicle/   OBD-II (ELM327), obliczenia, kody błędów, symulator, ekrany statystyk i diagnostyki
+app-phone/        aplikacja na telefon (zakładki, usługa w tle, powiadomienia)
+car/              ekrany Android Auto (Car App Library 1.7)
+app-headunit/     launcher na tablet / radio
+core/ui/          motywy, tryb nocny, komponenty
+feature/vehicle/  OBD-II (ELM327), obliczenia, historia, alerty, wyścig, ekrany Compose
+feature/media|weather|apps/   moduły tabletu
 ```
 
-Testy: `./gradlew testDebugUnitTest` · zrzuty ekranu bez emulatora: `./gradlew :app-headunit:recordPaparazziDebug`
-
-Plan i architektura: [docs/PLAN.md](docs/PLAN.md)
+- Testy logiki i ekranów Android Auto: `./gradlew testDebugUnitTest`
+- Zrzuty ekranu bez emulatora: `./gradlew recordPaparazziDebug`
+- Plan i architektura: [docs/PLAN.md](docs/PLAN.md)

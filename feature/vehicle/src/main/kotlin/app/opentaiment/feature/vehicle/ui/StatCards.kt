@@ -256,7 +256,8 @@ fun TripCard(stats: VehicleStats, modifier: Modifier = Modifier) {
         MetricRow("Czas jazdy", formatDuration(trip.durationMs))
         MetricRow("Średnia prędkość", "${trip.avgSpeedKmh.fmt()} km/h")
         MetricRow("Max prędkość", "${trip.maxSpeedKmh.fmt()} km/h")
-        MetricRow("Spalone paliwo", "${trip.fuelUsedL.fmt(2)} l")
+        MetricRow("Spalone paliwo", "${trip.fuelUsedL.fmt(2)} l · ${trip.fuelCost.fmt(2)} zł")
+        MetricRow("Eco-score", stats.eco?.let { "${it.score}/100" } ?: "zbieram dane…")
     }
 }
 

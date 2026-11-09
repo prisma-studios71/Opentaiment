@@ -1,5 +1,7 @@
 package app.opentaiment.feature.vehicle.data
 
+import app.opentaiment.feature.vehicle.obd.ObdPid
+
 /** Diagnostic trouble codes read from the car. */
 data class DtcReport(
     /** Check Engine / MIL lamp state, null if the car didn't report it. */
@@ -10,8 +12,54 @@ data class DtcReport(
     val pending: List<String>,
     /** Permanent codes (mode 0A) – can't be cleared by a scan tool, the ECU clears them itself. */
     val permanent: List<String>,
+    /** Engine values saved by the ECU at the moment the first fault was stored. */
+    val freezeFrame: FreezeFrame? = null,
+    /** Emission self-tests – what an inspection station checks. */
+    val readiness: Readiness? = null,
 ) {
     val totalCount: Int get() = (stored + pending + permanent).distinct().size
+}
+
+data class FreezeFrame(val dtc: String, val values: Map<ObdPid, Double>)
+
+data class ReadinessMonitor(val name: String, val complete: Boolean)
+
+data class Readiness(val diesel: Boolean, val monitors: List<ReadinessMonitor>) {
+    val incomplete: List<ReadinessMonitor> get() = monitors.filter { !it.complete }
+    val ready: Boolean get() = incomplete.isEmpty()
+
+    companion object {
+        private val CONTINUOUS = listOf("Wypadanie zapłonów", "Układ paliwowy", "Podzespoły silnika")
+        private val SPARK = listOf(
+            "Katalizator", "Podgrzewany katalizator", "Układ EVAP (opary paliwa)", "Wtórne powietrze",
+            "Klimatyzacja", "Sonda lambda", "Grzałka sondy lambda", "EGR / zmienne fazy",
+        )
+        private val DIESEL = listOf(
+            "Katalizator NMHC", "Układ NOx / SCR (AdBlue)", null, "Ciśnienie doładowania",
+            null, "Czujnik spalin", "Filtr cząstek stałych (DPF)", "EGR / zmienne fazy",
+        )
+
+        /**
+         * Decodes bytes B, C, D of PID 01 01. B holds the continuous monitors (bits 0–2 available,
+         * 4–6 incomplete) and the engine type (bit 3); C = available, D = incomplete non-continuous ones.
+         */
+        fun decode(data: IntArray): Readiness? {
+            if (data.size < 4) return null
+            val b = data[1]
+            val c = data[2]
+            val d = data[3]
+            val diesel = b and 0x08 != 0
+            val monitors = buildList {
+                CONTINUOUS.forEachIndexed { i, name ->
+                    if (b and (1 shl i) != 0) add(ReadinessMonitor(name, complete = b and (1 shl (i + 4)) == 0))
+                }
+                (if (diesel) DIESEL else SPARK).forEachIndexed { i, name ->
+                    if (name != null && c and (1 shl i) != 0) add(ReadinessMonitor(name, complete = d and (1 shl i) == 0))
+                }
+            }
+            return Readiness(diesel, monitors)
+        }
+    }
 }
 
 enum class DtcKind(val label: String, val explanation: String) {
@@ -133,4 +181,14 @@ object DtcDictionary {
         "U0140" to "Brak komunikacji ze sterownikiem nadwozia (BCM)",
         "U0155" to "Brak komunikacji z zestawem wskaźników",
     )
+}
+
+/** Polish plural: 1 błąd, 2–4 błędy, 5+ błędów (but 12–14 błędów). */
+fun dtcCountLabel(count: Int): String {
+    val word = when {
+        count == 1 -> "błąd"
+        count % 10 in 2..4 && count % 100 !in 12..14 -> "błędy"
+        else -> "błędów"
+    }
+    return "$count $word"
 }
