@@ -12,6 +12,10 @@ import androidx.compose.material.icons.rounded.Route
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Speed
 import androidx.compose.material.icons.rounded.Thermostat
+import androidx.compose.material.icons.rounded.Radio
+import androidx.compose.material.icons.rounded.Navigation
+import androidx.compose.material.icons.rounded.TireRepair
+import androidx.compose.material.icons.rounded.CarRepair
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.core.content.edit
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,6 +34,10 @@ enum class HomeWidget(val id: String, val label: String, val description: String
     ENGINE("engine", "Silnik", "Temperatury, akumulator, obciążenie (OBD)", Icons.Rounded.Thermostat),
     DIAGNOSTICS("diag", "Błędy", "Check Engine i liczba błędów (OBD)", Icons.Rounded.Build),
     WEEK("week", "Ten tydzień", "Kilometry, koszt paliwa i eco z całego tygodnia", Icons.Rounded.CalendarMonth),
+    RADIO("radio", "Radio", "Co gra w radiu i szybki wybór ulubionych stacji", Icons.Rounded.Radio),
+    NAVIGATION("nav", "Nawigacja", "Do domu, do pracy, stacje paliw w pobliżu", Icons.Rounded.Navigation),
+    TPMS("tpms", "Opony", "Ciśnienie w kołach z czujników TPMS (BLE)", Icons.Rounded.TireRepair),
+    SERVICE("service", "Serwis", "Najbliższy olej, przegląd, OC", Icons.Rounded.CarRepair),
     ;
 
     companion object {

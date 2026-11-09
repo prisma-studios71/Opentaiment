@@ -25,4 +25,5 @@ include(
     ":feature:weather",
     ":feature:apps",
     ":feature:vehicle",
+    ":feature:player",
 )

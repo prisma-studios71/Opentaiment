@@ -65,7 +65,10 @@ class ObdDataSource(
             // slowly changing temperatures/levels only every few cycles.
             val fast = listOf(ObdPid.MAF, ObdPid.INTAKE_MAP, ObdPid.FUEL_RATE, ObdPid.THROTTLE, ObdPid.ENGINE_LOAD)
                 .filter(::supports)
-            val slow = listOf(ObdPid.COOLANT_TEMP, ObdPid.INTAKE_TEMP, ObdPid.OIL_TEMP, ObdPid.AMBIENT_TEMP, ObdPid.FUEL_LEVEL)
+            val slow = listOf(
+                ObdPid.COOLANT_TEMP, ObdPid.INTAKE_TEMP, ObdPid.OIL_TEMP, ObdPid.AMBIENT_TEMP, ObdPid.FUEL_LEVEL,
+                ObdPid.BARO, ObdPid.ODOMETER,
+            )
                 .filter(::supports)
 
             var cycle = 0L
@@ -100,6 +103,8 @@ class ObdDataSource(
                         ambientTempC = values[ObdPid.AMBIENT_TEMP],
                         fuelLevelPct = values[ObdPid.FUEL_LEVEL],
                         voltage = voltage,
+                        baroKpa = values[ObdPid.BARO],
+                        odometerKm = values[ObdPid.ODOMETER],
                     ),
                 )
                 cycle++

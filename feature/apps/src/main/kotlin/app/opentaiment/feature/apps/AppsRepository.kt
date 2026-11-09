@@ -47,6 +47,24 @@ class AppsRepository(context: Context) {
         return start(Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=")))
     }
 
+    /**
+     * Starts turn-by-turn navigation to an address: Google Maps if installed, then Waze,
+     * otherwise any app that handles map links (OsmAnd, Sygic…).
+     */
+    fun navigateTo(address: String): Boolean {
+        val q = Uri.encode(address.trim())
+        if (installed("com.google.android.apps.maps") &&
+            start(Intent(Intent.ACTION_VIEW, Uri.parse("google.navigation:q=$q")).setPackage("com.google.android.apps.maps"))
+        ) return true
+        if (installed("com.waze") && start(Intent(Intent.ACTION_VIEW, Uri.parse("https://waze.com/ul?q=$q&navigate=yes")).setPackage("com.waze"))) return true
+        return start(Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=$q")))
+    }
+
+    /** "Stacje paliw w pobliżu" and similar searches on the map. */
+    fun searchNearby(what: String): Boolean = start(Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=" + Uri.encode(what))))
+
+    private fun installed(pkg: String) = pm.getLaunchIntentForPackage(pkg) != null
+
     /** Opens a music app when nothing is playing yet. */
     fun openMusic(): Boolean =
         MUSIC_APPS.firstOrNull { pm.getLaunchIntentForPackage(it) != null }?.let { launch(it) } ?: false

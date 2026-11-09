@@ -14,6 +14,10 @@ import androidx.compose.material.icons.rounded.Navigation
 import androidx.compose.material.icons.rounded.Phone
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Speed
+import androidx.compose.material.icons.rounded.Radio
+import androidx.compose.material.icons.rounded.TireRepair
+import androidx.compose.material.icons.rounded.CarRepair
+import androidx.compose.material.icons.rounded.Home
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.core.content.edit
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,6 +38,11 @@ enum class BuiltinTile(val id: String, val label: String, val icon: ImageVector)
     SETTINGS("settings", "Ustawienia", Icons.Rounded.Settings),
     ANDROID_SETTINGS("android", "Android", Icons.Rounded.Android),
     PHONE("phone", "Telefon", Icons.Rounded.Phone),
+    RADIO("radio", "Radio", Icons.Rounded.Radio),
+    GAUGES("gauges", "Zegary", Icons.Rounded.Speed),
+    TPMS("tpms", "Opony", Icons.Rounded.TireRepair),
+    SERVICE("service", "Serwis", Icons.Rounded.CarRepair),
+    NAV_HOME("navhome", "Do domu", Icons.Rounded.Home),
     ;
 
     companion object {
@@ -49,10 +58,10 @@ object TileIds {
 
 /** Pure list operations, kept separate from storage so they are easy to test. */
 object TileList {
-    const val MAX_TILES = 8
+    const val MAX_TILES = 12
 
     val DEFAULT: List<String> = listOf(
-        BuiltinTile.NAVIGATION, BuiltinTile.MUSIC, BuiltinTile.DRIVE, BuiltinTile.STATS,
+        BuiltinTile.NAVIGATION, BuiltinTile.RADIO, BuiltinTile.DRIVE, BuiltinTile.STATS,
         BuiltinTile.DIAGNOSTICS, BuiltinTile.TRIPS, BuiltinTile.APPS, BuiltinTile.SETTINGS,
     ).map { it.id }
 

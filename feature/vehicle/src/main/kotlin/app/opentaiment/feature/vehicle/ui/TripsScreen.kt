@@ -20,6 +20,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DeleteSweep
+import androidx.compose.material.icons.rounded.IosShare
+import androidx.compose.foundation.clickable
+import app.opentaiment.feature.vehicle.data.TrackPoint
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -51,6 +54,11 @@ class TripsActions(
     val onBack: (() -> Unit)?,
     val onDelete: (Long) -> Unit,
     val onClearAll: () -> Unit,
+    /** Shares all trips as a spreadsheet; null hides the button. */
+    val onExportCsv: (() -> Unit)? = null,
+    /** GPS trace of a trip, for the route map; null = no trip details. */
+    val trackOf: ((Long) -> List<TrackPoint>)? = null,
+    val onShareGpx: ((TripRecord) -> Unit)? = null,
 )
 
 private val dateFormat = DateTimeFormatter.ofPattern("EEE d MMM, HH:mm", Locale("pl"))
@@ -64,11 +72,13 @@ fun TripsScreen(
     zone: ZoneId = ZoneId.systemDefault(),
 ) {
     var confirmClear by remember { mutableStateOf(false) }
+    var opened by remember { mutableStateOf<TripRecord?>(null) }
     val week = remember(trips, now) { TripSummaries.thisWeek(trips, now, zone) }
     val month = remember(trips, now) { TripSummaries.thisMonth(trips, now, zone) }
 
     Column(modifier) {
         ScreenHeader("Trasy", connection = null, onBack = actions.onBack) {
+            if (trips.isNotEmpty() && actions.onExportCsv != null) HeaderButton(Icons.Rounded.IosShare, "Eksport CSV", actions.onExportCsv)
             if (trips.isNotEmpty()) HeaderButton(Icons.Rounded.DeleteSweep, "Wyczyść", { confirmClear = true })
         }
         Spacer(Modifier.height(16.dp))
@@ -99,9 +109,41 @@ fun TripsScreen(
                         )
                     }
                 }
-                items(trips, key = { it.id }) { trip -> TripItem(trip, zone, onDelete = { actions.onDelete(trip.id) }) }
+                items(trips, key = { it.id }) { trip ->
+                    TripItem(
+                        trip, zone,
+                        onDelete = { actions.onDelete(trip.id) },
+                        onOpen = actions.trackOf?.let { { opened = trip } },
+                    )
+                }
             }
         }
+    }
+
+    opened?.let { trip ->
+        val track = remember(trip.id) { actions.trackOf?.invoke(trip.id).orEmpty() }
+        AlertDialog(
+            onDismissRequest = { opened = null },
+            title = {
+                Text(Instant.ofEpochMilli(trip.startEpochMs).atZone(zone).format(dateFormat).replaceFirstChar { it.titlecase(Locale("pl")) })
+            },
+            text = {
+                Column {
+                    Text(
+                        "${trip.distanceKm.fmt(1)} km · ${formatDuration(trip.durationMs)} · ${trip.avgLPer100Km.fmt(1)} l/100 · ${trip.cost.fmt(2)} zł",
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    RouteMap(track, Modifier.fillMaxWidth().height(320.dp))
+                }
+            },
+            confirmButton = {
+                if (track.size >= 2 && actions.onShareGpx != null) {
+                    TextButton(onClick = { actions.onShareGpx.invoke(trip) }) { Text("Eksport GPX") }
+                }
+            },
+            dismissButton = { TextButton(onClick = { opened = null }) { Text("Zamknij") } },
+        )
     }
 
     if (confirmClear) {
@@ -146,8 +188,9 @@ private fun Mini(label: String, value: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun TripItem(trip: TripRecord, zone: ZoneId, onDelete: () -> Unit) {
+private fun TripItem(trip: TripRecord, zone: ZoneId, onDelete: () -> Unit, onOpen: (() -> Unit)? = null) {
     Card(
+        modifier = if (onOpen != null) Modifier.clip(RoundedCornerShape(20.dp)).clickable(onClick = onOpen) else Modifier,
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
     ) {

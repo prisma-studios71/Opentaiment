@@ -16,7 +16,27 @@ import app.opentaiment.feature.vehicle.data.TripRecord
 import app.opentaiment.feature.vehicle.data.VehicleAlert
 import app.opentaiment.feature.vehicle.data.VehicleProfile
 import app.opentaiment.feature.vehicle.data.VehicleStats
+import app.opentaiment.feature.vehicle.data.ReminderStatus
+import app.opentaiment.feature.vehicle.data.ServiceReminder
+import app.opentaiment.feature.vehicle.data.ServiceReminders
+import app.opentaiment.feature.vehicle.data.TrackPoint
+import app.opentaiment.feature.vehicle.data.TrackRecorder
+import app.opentaiment.feature.vehicle.data.TrackStore
+import app.opentaiment.feature.vehicle.data.TripJson
+import app.opentaiment.feature.vehicle.obd.BleObdTransport
 import app.opentaiment.feature.vehicle.obd.BluetoothObdTransport
+import app.opentaiment.feature.vehicle.race.GpsFix
+import app.opentaiment.feature.vehicle.source.ReconnectPolicy
+import android.bluetooth.BluetoothDevice
+import android.bluetooth.le.ScanCallback
+import android.bluetooth.le.ScanResult
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.suspendCancellableCoroutine
+import java.io.File
+import kotlin.coroutines.resume
 import app.opentaiment.feature.vehicle.race.GpsSource
 import app.opentaiment.feature.vehicle.race.RaceState
 import app.opentaiment.feature.vehicle.race.RaceTracker
@@ -41,7 +61,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import java.util.Locale
 
-data class ObdDevice(val name: String, val address: String) {
+data class ObdDevice(val name: String, val address: String, val ble: Boolean = false) {
     val looksLikeObd: Boolean
         get() = OBD_NAME_HINTS.any { name.uppercase(Locale.ROOT).contains(it) }
 
@@ -54,7 +74,8 @@ sealed interface ConnectionState {
     data object Disconnected : ConnectionState
     data class Connecting(val deviceName: String) : ConnectionState
     data class Connected(val deviceName: String, val demo: Boolean) : ConnectionState
-    data class Failed(val message: String) : ConnectionState
+    /** [reconnecting]: the app keeps retrying on its own (lost link to a known adapter). */
+    data class Failed(val message: String, val reconnecting: Boolean = false) : ConnectionState
 }
 
 sealed interface DiagnosticsState {
@@ -118,11 +139,51 @@ class VehicleRepository(context: Context, private val scope: CoroutineScope) {
     /** Lap timer and g-meter (GPS). */
     val race: StateFlow<RaceState> = _race.asStateFlow()
 
+    private val tracks = TrackStore(File(appContext.filesDir, "tracks"))
+    private val trackRecorder = TrackRecorder()
+    private val inProgressFile = File(appContext.filesDir, "trip_in_progress.json")
+
+    private val _gpsSpeedKmh = MutableStateFlow<Double?>(null)
+    /** Speed from GPS (when something keeps GPS on) – a fallback when the car isn't connected. */
+    val gpsSpeedKmh: StateFlow<Double?> = _gpsSpeedKmh.asStateFlow()
+    private val gpsUsers = mutableSetOf<String>()
+
+    private val _reminders = MutableStateFlow(ServiceReminders.decode(prefs.getString(KEY_REMINDERS, null)))
+    val reminders: StateFlow<List<ServiceReminder>> = _reminders.asStateFlow()
+
+    private val _odometerBase = MutableStateFlow(
+        prefs.getFloat(KEY_ODO_BASE, -1f).takeIf { it >= 0 }?.toDouble() to prefs.getLong(KEY_ODO_BASE_TIME, 0L),
+    )
+
+    /** Best known odometer reading (from the car, or the user's reading plus trips since). */
+    val odometerKm: StateFlow<Double?> = combine(_stats, history.trips, _odometerBase) { stats, trips, (base, baseTime) ->
+        stats.odometerKm?.also { carKm -> rememberCarOdometer(carKm) }
+            ?: ServiceReminders.odometer(null, base, baseTime, trips)
+    }.stateIn(scope, SharingStarted.Eagerly, null)
+
+    /** Service reminders, most urgent first. */
+    val reminderStatuses: StateFlow<List<ReminderStatus>> = combine(_reminders, odometerKm) { list, odo ->
+        ServiceReminders.statuses(list, odo, ServiceReminders.today())
+    }.stateIn(scope, SharingStarted.Eagerly, emptyList())
+
+    /** The adapter the user wants to stay connected to; null after "Rozłącz" or in demo mode. */
+    private var wanted: ObdDevice? = null
+    private var reconnectJob: Job? = null
+    private var checkpointJob: Job? = null
+    private var lastSampleWallMs = 0L
+
+    /** No data for longer than the engine-off split: whatever comes next is a new trip. */
+    private fun tripLooksOver() = System.currentTimeMillis() - lastSampleWallMs > ENGINE_OFF_SPLIT_MS
+
     private var job: Job? = null
     private var requests: Channel<ObdRequest>? = null
     private var tripStartEpochMs: Long? = null
     private var tripIsDemo = false
     private var engineOffSinceMs: Long? = null
+
+    init {
+        recoverInterruptedTrip()
+    }
 
     fun hasBluetoothPermission(): Boolean =
         Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
@@ -136,7 +197,7 @@ class VehicleRepository(context: Context, private val scope: CoroutineScope) {
         val adapter = appContext.getSystemService(BluetoothManager::class.java)?.adapter ?: return emptyList()
         return try {
             adapter.bondedDevices.orEmpty()
-                .map { ObdDevice(it.name ?: it.address, it.address) }
+                .map { ObdDevice(it.name ?: it.address, it.address, ble = it.type == BluetoothDevice.DEVICE_TYPE_LE) }
                 .sortedWith(compareByDescending<ObdDevice> { it.looksLikeObd }.thenBy { it.name })
         } catch (e: SecurityException) {
             emptyList()
@@ -147,31 +208,122 @@ class VehicleRepository(context: Context, private val scope: CoroutineScope) {
         prefs.edit {
             putString(KEY_LAST_ADDRESS, device.address)
             putString(KEY_LAST_NAME, device.name)
+            putBoolean(KEY_LAST_BLE, device.ble)
         }
-        start(device.name, demo = false, ObdDataSource({ BluetoothObdTransport.connect(appContext, device.address) }))
+        wanted = device
+        reconnectJob?.cancel()
+        open(device, attempt = 0)
     }
+
+    private fun open(device: ObdDevice, attempt: Int) {
+        val source = ObdDataSource({
+            if (device.ble) BleObdTransport.connect(appContext, device.address)
+            else BluetoothObdTransport.connect(appContext, device.address)
+        })
+        start(
+            device.name, demo = false, source,
+            onLost = { message -> scheduleReconnect(device, attempt, message) },
+            keepTrip = attempt > 0,
+        )
+    }
+
+    /** Keeps trying the same adapter after the link dropped – the car may just be starting. */
+    private fun scheduleReconnect(device: ObdDevice, attempt: Int, message: String) {
+        if (wanted != device || !autoReconnectEnabled) {
+            _connection.value = ConnectionState.Failed(message)
+            return
+        }
+        _connection.value = ConnectionState.Failed(message, reconnecting = true)
+        reconnectJob?.cancel()
+        reconnectJob = scope.launch {
+            delay(ReconnectPolicy.delayMs(attempt))
+            if (tripLooksOver()) finishTrip() // car parked with the adapter unpowered
+            if (wanted == device && job?.isActive != true) open(device, attempt + 1)
+        }
+    }
+
+    /** Reconnect on its own after a dropped link (on by default). */
+    var autoReconnectEnabled: Boolean
+        get() = prefs.getBoolean(KEY_AUTO_RECONNECT, true)
+        set(value) = prefs.edit { putBoolean(KEY_AUTO_RECONNECT, value) }
 
     /** The adapter used last time, if any. */
     fun lastDevice(): ObdDevice? {
         val address = prefs.getString(KEY_LAST_ADDRESS, null) ?: return null
-        return ObdDevice(prefs.getString(KEY_LAST_NAME, null) ?: address, address)
+        return ObdDevice(prefs.getString(KEY_LAST_NAME, null) ?: address, address, prefs.getBoolean(KEY_LAST_BLE, false))
     }
 
     /** Reconnects to the last used adapter – handy when the tablet boots with the car. */
     fun autoConnect() {
         if (job?.isActive == true || !hasBluetoothPermission()) return
+        if (_connection.value is ConnectionState.Connected) return
         lastDevice()?.let(::connect)
     }
 
-    fun startDemo() = start("Tryb demo", demo = true, SimulatedDataSource())
+    fun startDemo() {
+        wanted = null
+        reconnectJob?.cancel()
+        start("Tryb demo", demo = true, SimulatedDataSource())
+    }
 
     fun disconnect() {
+        wanted = null
+        reconnectJob?.cancel()
         finishTrip()
         job?.cancel()
         job = null
         requests?.close()
         requests = null
         _connection.value = ConnectionState.Disconnected
+    }
+
+    /**
+     * Ignition off / head unit going to sleep: save the trip right away (power may vanish any
+     * second), but keep wanting the adapter so the next ignition-on reconnects.
+     */
+    fun onIgnitionOff() {
+        val device = wanted
+        reconnectJob?.cancel()
+        finishTrip()
+        job?.cancel()
+        job = null
+        requests?.close()
+        requests = null
+        wanted = device
+        _connection.value = ConnectionState.Disconnected
+    }
+
+    // ---------- BLE adapters ----------
+
+    fun hasBleScanPermission(): Boolean {
+        val needed = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Manifest.permission.BLUETOOTH_SCAN
+        else Manifest.permission.ACCESS_FINE_LOCATION
+        return ContextCompat.checkSelfPermission(appContext, needed) == PackageManager.PERMISSION_GRANTED
+    }
+
+    /** Looks for BLE OBD adapters nearby for a few seconds (they usually don't need pairing). */
+    @SuppressLint("MissingPermission")
+    suspend fun scanBleAdapters(durationMs: Long = 6_000): List<ObdDevice> {
+        if (!hasBleScanPermission() || !hasBluetoothPermission()) return emptyList()
+        val scanner = appContext.getSystemService(BluetoothManager::class.java)?.adapter
+            ?.takeIf { it.isEnabled }?.bluetoothLeScanner ?: return emptyList()
+        val found = LinkedHashMap<String, ObdDevice>()
+        val callback = object : ScanCallback() {
+            override fun onScanResult(callbackType: Int, result: ScanResult) {
+                val name = result.scanRecord?.deviceName ?: try { result.device.name } catch (e: SecurityException) { null }
+                if (name.isNullOrBlank()) return
+                found[result.device.address] = ObdDevice(name, result.device.address, ble = true)
+            }
+        }
+        try {
+            scanner.startScan(callback)
+            delay(durationMs)
+        } catch (e: SecurityException) {
+            return emptyList()
+        } finally {
+            try { scanner.stopScan(callback) } catch (_: Exception) {}
+        }
+        return found.values.sortedWith(compareByDescending<ObdDevice> { it.looksLikeObd }.thenBy { it.name })
     }
 
     /** Reads trouble codes over the open connection. */
@@ -234,10 +386,7 @@ class VehicleRepository(context: Context, private val scope: CoroutineScope) {
 
     /** Starts GPS for laps and the g-meter. Returns false without permission or with GPS off. */
     fun startRaceGps(): Boolean {
-        val started = gps.start { fix ->
-            raceTracker.addFix(fix, obdAccelAvailable = _connection.value is ConnectionState.Connected)
-            _race.value = raceTracker.state
-        }
+        val started = requestGps(RACE_USER)
         raceTracker.setGpsActive(started)
         _race.value = raceTracker.state
         if (started && raceClock?.isActive != true) {
@@ -253,7 +402,7 @@ class VehicleRepository(context: Context, private val scope: CoroutineScope) {
     }
 
     fun stopRaceGps() {
-        gps.stop()
+        releaseGps(RACE_USER)
         raceClock?.cancel()
         raceTracker.setGpsActive(false)
         _race.value = raceTracker.state
@@ -266,35 +415,148 @@ class VehicleRepository(context: Context, private val scope: CoroutineScope) {
         _race.value = raceTracker.state
     }
 
-    fun deleteTrip(id: Long) = history.delete(id)
-    fun clearTrips() = history.clear()
+    fun deleteTrip(id: Long) {
+        history.delete(id)
+        tracks.delete(id)
+    }
+
+    fun clearTrips() {
+        history.clear()
+        tracks.clear()
+    }
+
+    /** GPS trace of a saved trip (empty when GPS was off). */
+    fun trackOf(tripId: Long): List<TrackPoint> = tracks.load(tripId)
+    fun hasTrack(tripId: Long): Boolean = tracks.has(tripId)
+
+    // ---------- service reminders ----------
+
+    fun updateReminder(reminder: ServiceReminder) = saveReminders(
+        _reminders.value.map { if (it.id == reminder.id) reminder else it }.let { list ->
+            if (list.any { it.id == reminder.id }) list else list + reminder
+        },
+    )
+
+    fun deleteReminder(id: String) = saveReminders(_reminders.value.filterNot { it.id == id })
+
+    /** "Zrobione dziś": resets the reminder to the current odometer and date. */
+    fun markReminderDone(id: String) = saveReminders(
+        _reminders.value.map {
+            if (it.id == id) it.copy(lastDoneKm = odometerKm.value, lastDoneEpochDay = ServiceReminders.today().toEpochDay()) else it
+        },
+    )
+
+    private fun saveReminders(list: List<ServiceReminder>) {
+        _reminders.value = list
+        prefs.edit { putString(KEY_REMINDERS, ServiceReminders.encode(list)) }
+    }
+
+    /** The user typed in what the dashboard odometer shows now. */
+    fun setOdometer(km: Double) {
+        prefs.edit {
+            putFloat(KEY_ODO_BASE, km.toFloat())
+            putLong(KEY_ODO_BASE_TIME, System.currentTimeMillis())
+        }
+        _odometerBase.value = km to System.currentTimeMillis()
+    }
+
+    private fun rememberCarOdometer(km: Double) {
+        // Keeps the estimate close to the truth if the adapter is later swapped for one without
+        // PID A6. Written at most once per kilometre.
+        if (kotlin.math.abs((_odometerBase.value.first ?: -1.0) - km) > 1.0) setOdometer(km)
+    }
+
+    // ---------- GPS (shared by race mode, trip traces and speed-dependent volume) ----------
+
+    /** Keeps GPS on while at least one user (e.g. "track", "volume") wants it. */
+    fun requestGps(user: String): Boolean {
+        gpsUsers += user
+        return ensureGps()
+    }
+
+    fun releaseGps(user: String) {
+        gpsUsers -= user
+        if (gpsUsers.isEmpty()) {
+            gps.stop()
+            _gpsSpeedKmh.value = null
+        }
+    }
+
+    private fun ensureGps(): Boolean = gps.start(::onGpsFix)
+
+    private fun onGpsFix(fix: GpsFix) {
+        _gpsSpeedKmh.value = fix.speedMs?.let { it * 3.6 }
+        if (RACE_USER in gpsUsers) {
+            raceTracker.addFix(fix, obdAccelAvailable = _connection.value is ConnectionState.Connected)
+            _race.value = raceTracker.state
+        }
+        if (tripStartEpochMs != null && !tripIsDemo) {
+            trackRecorder.add(TrackPoint(System.currentTimeMillis(), fix.lat, fix.lon, fix.speedMs?.let { it * 3.6 }), fix.accuracyM)
+        }
+    }
 
     /** Saves the trip in progress (if it is long enough to matter) and resets the counters. */
     private fun finishTrip() {
-        val stats = calculator.current
-        val start = tripStartEpochMs
-        if (start != null && stats.trip.distanceKm >= MIN_TRIP_KM) {
-            history.add(
-                TripRecord(
-                    startEpochMs = start,
-                    endEpochMs = System.currentTimeMillis(),
-                    distanceKm = stats.trip.distanceKm,
-                    durationMs = stats.trip.durationMs,
-                    movingMs = stats.trip.movingMs,
-                    fuelUsedL = stats.trip.fuelUsedL,
-                    fuelPricePerL = calculator.profile.fuelPricePerL,
-                    maxSpeedKmh = stats.trip.maxSpeedKmh,
-                    ecoScore = stats.eco?.score,
-                    best0to100Sec = stats.best0to100Sec,
-                    quarterMileSec = stats.quarterMile?.bestSec,
-                    demo = tripIsDemo,
-                ),
-            )
+        val record = currentTripRecord()
+        if (record != null && record.distanceKm >= MIN_TRIP_KM) {
+            history.add(record)
+            tracks.save(record.id, trackRecorder.snapshot())
         }
+        trackRecorder.clear()
+        checkpointJob?.cancel()
+        checkpointJob = null
+        inProgressFile.delete()
         tripStartEpochMs = null
         engineOffSinceMs = null
         calculator.resetTrip()
         _stats.value = calculator.current
+    }
+
+    /** The trip so far, as it would be saved now. */
+    private fun currentTripRecord(): TripRecord? {
+        val stats = calculator.current
+        val start = tripStartEpochMs ?: return null
+        return TripRecord(
+            startEpochMs = start,
+            endEpochMs = System.currentTimeMillis(),
+            distanceKm = stats.trip.distanceKm,
+            durationMs = stats.trip.durationMs,
+            movingMs = stats.trip.movingMs,
+            fuelUsedL = stats.trip.fuelUsedL,
+            fuelPricePerL = calculator.profile.fuelPricePerL,
+            maxSpeedKmh = stats.trip.maxSpeedKmh,
+            ecoScore = stats.eco?.score,
+            best0to100Sec = stats.best0to100Sec,
+            quarterMileSec = stats.quarterMile?.bestSec,
+            demo = tripIsDemo,
+        )
+    }
+
+    /**
+     * Car head units often lose power without warning. Every so often the trip in progress is
+     * written to disk; after an unclean shutdown it is added to the history on next start.
+     */
+    private fun checkpointLoop() = scope.launch {
+        while (true) {
+            delay(CHECKPOINT_MS)
+            val record = currentTripRecord() ?: continue
+            if (record.distanceKm < MIN_TRIP_KM) continue
+            val json = TripJson.encode(listOf(record))
+            val points = trackRecorder.snapshot()
+            launch(Dispatchers.IO) {
+                val tmp = File(inProgressFile.parentFile, inProgressFile.name + ".tmp")
+                tmp.writeText(json)
+                tmp.renameTo(inProgressFile)
+                tracks.save(record.id, points)
+            }
+        }
+    }
+
+    private fun recoverInterruptedTrip() {
+        if (!inProgressFile.exists()) return
+        val record = try { TripJson.decode(inProgressFile.readText()).firstOrNull() } catch (e: Exception) { null }
+        if (record != null && record.distanceKm >= MIN_TRIP_KM && trips.value.none { it.id == record.id }) history.add(record)
+        inProgressFile.delete()
     }
 
     fun updateProfile(profile: VehicleProfile) {
@@ -312,8 +574,15 @@ class VehicleRepository(context: Context, private val scope: CoroutineScope) {
      * Starts reading from any [source] – used by [connect] and [startDemo], and by tests or future
      * transports (e.g. BLE adapters) that bring their own data source.
      */
-    fun start(name: String, demo: Boolean, source: VehicleDataSource) {
-        finishTrip() // switching cars / to demo: keep what was driven so far
+    fun start(
+        name: String,
+        demo: Boolean,
+        source: VehicleDataSource,
+        onLost: ((String) -> Unit)? = null,
+        keepTrip: Boolean = false,
+    ) {
+        // Switching cars / to demo: keep what was driven so far. A quick reconnect continues the trip.
+        if (!keepTrip || tripLooksOver()) finishTrip()
         job?.cancel()
         requests?.close()
         val channel = Channel<ObdRequest>(Channel.UNLIMITED)
@@ -324,12 +593,15 @@ class VehicleRepository(context: Context, private val scope: CoroutineScope) {
             try {
                 var first = true
                 source.samples(channel).collect { sample ->
+                    lastSampleWallMs = System.currentTimeMillis()
                     if (_connection.value !is ConnectionState.Connected) {
                         _connection.value = ConnectionState.Connected(name, demo)
                     }
                     if (tripStartEpochMs == null) {
                         tripStartEpochMs = System.currentTimeMillis()
                         tripIsDemo = demo
+                        trackRecorder.clear()
+                        if (!demo) checkpointJob = checkpointLoop()
                     }
                     val previousAlerts = _stats.value.alerts.map { it.type }.toSet()
                     val stats = calculator.add(sample)
@@ -350,8 +622,12 @@ class VehicleRepository(context: Context, private val scope: CoroutineScope) {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                finishTrip()
-                _connection.value = ConnectionState.Failed(e.message ?: "Nie udało się połączyć z adapterem")
+                // Keep the trip open across a short drop-out; it closes after the engine-off timeout
+                // or when the user disconnects. A lost link with nothing driven yet saves nothing anyway.
+                val message = e.message ?: "Nie udało się połączyć z adapterem"
+                if (onLost == null) finishTrip()
+                _connection.value = ConnectionState.Failed(message)
+                onLost?.invoke(message)
             } finally {
                 // Link is gone: nobody will answer queued requests any more.
                 channel.close()
@@ -385,6 +661,13 @@ class VehicleRepository(context: Context, private val scope: CoroutineScope) {
     private companion object {
         const val KEY_LAST_ADDRESS = "last_address"
         const val KEY_LAST_NAME = "last_name"
+        const val KEY_LAST_BLE = "last_ble"
+        const val KEY_AUTO_RECONNECT = "auto_reconnect"
+        const val KEY_REMINDERS = "reminders"
+        const val KEY_ODO_BASE = "odometer_base"
+        const val KEY_ODO_BASE_TIME = "odometer_base_time"
+        const val RACE_USER = "race"
+        const val CHECKPOINT_MS = 20_000L
         const val KEY_FUEL = "fuel"
         const val KEY_MASS = "mass"
         const val KEY_DISPLACEMENT = "displacement"

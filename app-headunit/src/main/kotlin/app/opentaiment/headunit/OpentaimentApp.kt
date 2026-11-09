@@ -66,8 +66,22 @@ import app.opentaiment.headunit.tiles.TileIds
 import app.opentaiment.headunit.tiles.TileOption
 import app.opentaiment.headunit.tiles.WidgetEditorActions
 import app.opentaiment.headunit.tiles.WidgetEditorScreen
+import app.opentaiment.feature.player.PlayerActions
+import app.opentaiment.feature.player.PlayerScreen
+import app.opentaiment.feature.player.PlayerScreenData
+import app.opentaiment.feature.player.PlayerState
+import app.opentaiment.feature.vehicle.data.ReminderLevel
+import app.opentaiment.feature.vehicle.data.ReminderStatus
+import app.opentaiment.feature.vehicle.tpms.TpmsState
+import app.opentaiment.feature.vehicle.ui.GaugesScreen
+import app.opentaiment.feature.vehicle.ui.ServiceActions
+import app.opentaiment.feature.vehicle.ui.ServiceScreen
+import app.opentaiment.feature.vehicle.ui.TpmsActions
+import app.opentaiment.feature.vehicle.ui.TpmsScreen
+import app.opentaiment.headunit.car.CarSettingsActions
+import app.opentaiment.headunit.car.CarSettingsSection
 
-private enum class Screen { Home, Apps, Drive, Stats, Diagnostics, Trips, Race, Settings, EditTiles, EditWidgets }
+private enum class Screen { Home, Apps, Drive, Stats, Diagnostics, Trips, Race, Settings, EditTiles, EditWidgets, Player, Gauges, Tpms, Service }
 
 @Composable
 fun OpentaimentApp(viewModel: HomeViewModel, isDefaultHome: () -> Boolean) {
@@ -102,6 +116,33 @@ fun OpentaimentApp(viewModel: HomeViewModel, isDefaultHome: () -> Boolean) {
     val trips by viewModel.trips.collectAsStateWithLifecycle()
     val race by viewModel.race.collectAsStateWithLifecycle()
     val appearance by viewModel.appearance.collectAsStateWithLifecycle()
+    val playerState by viewModel.playerState.collectAsStateWithLifecycle()
+    val favorites by viewModel.favorites.collectAsStateWithLifecycle()
+    val popularStations by viewModel.popularStations.collectAsStateWithLifecycle()
+    val stationSearch by viewModel.stationSearch.collectAsStateWithLifecycle()
+    val localTracks by viewModel.localTracks.collectAsStateWithLifecycle()
+    val tpms by viewModel.tpms.collectAsStateWithLifecycle()
+    val tpmsEnabled by viewModel.tpmsEnabled.collectAsStateWithLifecycle()
+    val reminders by viewModel.reminders.collectAsStateWithLifecycle()
+    val odometer by viewModel.odometerKm.collectAsStateWithLifecycle()
+    val carSettings by viewModel.carSettings.collectAsStateWithLifecycle()
+    val carPermissions by viewModel.carPermissions.collectAsStateWithLifecycle()
+    val autoReconnect by viewModel.autoReconnect.collectAsStateWithLifecycle()
+    val requested by viewModel.requestedScreen.collectAsStateWithLifecycle()
+
+    LaunchedEffect(requested) {
+        when (requested) {
+            MainActivity.SCREEN_PLAYER -> screen = Screen.Player
+            MainActivity.SCREEN_DRIVE -> screen = Screen.Drive
+        }
+        if (requested != null) viewModel.consumeRequestedScreen()
+    }
+
+    val finePermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { viewModel.refreshPermissions() }
+    val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    LaunchedEffect(Unit) {
+        if (android.os.Build.VERSION.SDK_INT >= 33) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
 
     val connectActions = remember(viewModel) {
         ObdConnectActions(
@@ -110,6 +151,8 @@ fun OpentaimentApp(viewModel: HomeViewModel, isDefaultHome: () -> Boolean) {
             onConnect = viewModel::connectObd,
             onDemo = viewModel::startVehicleDemo,
             onOpenBluetoothSettings = { viewModel.openBluetooth() },
+            scanBle = viewModel::scanBleAdapters,
+            hasBleScanPermission = viewModel::hasBleScanPermission,
         )
     }
 
@@ -124,13 +167,18 @@ fun OpentaimentApp(viewModel: HomeViewModel, isDefaultHome: () -> Boolean) {
                 AlertBanner(vehicleStats.alerts.takeIf { vehicleConnection is ConnectionState.Connected }.orEmpty(), Modifier.padding(bottom = 16.dp))
                 HomeScreen(
                 widgets = widgets,
-                data = WidgetData(now, weather, nowPlaying, hasMediaAccess, vehicleConnection, vehicleStats, diagnostics, trips),
+                data = WidgetData(
+                    now, weather, nowPlaying, hasMediaAccess, vehicleConnection, vehicleStats, diagnostics, trips,
+                    player = playerState, favorites = favorites, tpms = tpms, tpmsEnabled = tpmsEnabled,
+                    reminders = reminders, homeAddress = carSettings.homeAddress, workAddress = carSettings.workAddress,
+                ),
                 tiles = homeTiles(
                     ids = tileIds,
                     apps = apps,
                     connection = vehicleConnection,
                     stats = vehicleStats,
                     diagnostics = diagnostics,
+                    extras = TileExtras(playerState, tpms.takeIf { tpmsEnabled }, reminders),
                     onBuiltin = { tile ->
                         when (tile) {
                             BuiltinTile.NAVIGATION -> viewModel.openNavigation()
@@ -145,6 +193,11 @@ fun OpentaimentApp(viewModel: HomeViewModel, isDefaultHome: () -> Boolean) {
                             BuiltinTile.SETTINGS -> screen = Screen.Settings
                             BuiltinTile.ANDROID_SETTINGS -> viewModel.openSettings()
                             BuiltinTile.PHONE -> viewModel.openDialer()
+                            BuiltinTile.RADIO -> screen = Screen.Player
+                            BuiltinTile.GAUGES -> screen = Screen.Gauges
+                            BuiltinTile.TPMS -> screen = Screen.Tpms
+                            BuiltinTile.SERVICE -> screen = Screen.Service
+                            BuiltinTile.NAV_HOME -> viewModel.navigateHome()
                         }
                     },
                     onApp = { viewModel.launch(it) },
@@ -161,6 +214,17 @@ fun OpentaimentApp(viewModel: HomeViewModel, isDefaultHome: () -> Boolean) {
                         onOpenStats = { screen = Screen.Stats },
                         onOpenDiagnostics = { screen = Screen.Diagnostics },
                         onOpenTrips = { screen = Screen.Trips },
+                        onOpenRadio = { screen = Screen.Player },
+                        onPlayStation = viewModel::playStation,
+                        onRadioToggle = viewModel::radioToggle,
+                        onRadioNext = viewModel::radioNext,
+                        onRadioPrevious = viewModel::radioPrevious,
+                        onOpenNavigation = { viewModel.openNavigation() },
+                        onNavigateHome = { viewModel.navigateHome() },
+                        onNavigateWork = { viewModel.navigateWork() },
+                        onSearchNearby = { viewModel.searchNearby(it) },
+                        onOpenTpms = { screen = Screen.Tpms },
+                        onOpenService = { screen = Screen.Service },
                     ),
                     onEditTiles = { screen = Screen.EditTiles },
                     onEditWidgets = { slot ->
@@ -177,7 +241,12 @@ fun OpentaimentApp(viewModel: HomeViewModel, isDefaultHome: () -> Boolean) {
             }
             Screen.Trips -> TripsScreen(
                 trips,
-                TripsActions({ screen = Screen.Home }, viewModel::deleteTrip, viewModel::clearTrips),
+                TripsActions(
+                    { screen = Screen.Home }, viewModel::deleteTrip, viewModel::clearTrips,
+                    onExportCsv = viewModel::exportTripsCsv,
+                    trackOf = viewModel::trackOf,
+                    onShareGpx = viewModel::shareGpx,
+                ),
                 content,
             )
             Screen.Race -> RaceScreen(
@@ -197,6 +266,19 @@ fun OpentaimentApp(viewModel: HomeViewModel, isDefaultHome: () -> Boolean) {
                 onBack = { screen = Screen.Home },
                 modifier = content,
             ) {
+                CarSettingsSection(
+                    settings = carSettings,
+                    permissions = carPermissions,
+                    actions = CarSettingsActions(
+                        onChange = viewModel::updateCarSettings,
+                        onGrantBrightness = viewModel::openBrightnessPermission,
+                        onGrantOverlay = viewModel::openOverlayPermission,
+                        onOpenAccessibility = viewModel::openAccessibilitySettings,
+                        onGrantLocation = { finePermission.launch(Manifest.permission.ACCESS_FINE_LOCATION) },
+                        onAutoReconnect = viewModel::setAutoReconnect,
+                        autoReconnect = autoReconnect,
+                    ),
+                )
                 OtCard(Modifier.fillMaxWidth()) {
                     Text("Tablet", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.height(12.dp))
@@ -257,6 +339,55 @@ fun OpentaimentApp(viewModel: HomeViewModel, isDefaultHome: () -> Boolean) {
                     modifier = content,
                 )
             }
+            Screen.Player -> PlayerScreen(
+                data = PlayerScreenData(
+                    playerState, favorites, popularStations, stationSearch, localTracks, viewModel.hasStoragePermission(),
+                ),
+                actions = PlayerActions(
+                    onBack = { screen = Screen.Home },
+                    onPlayStation = viewModel::playStation,
+                    onToggleFavorite = viewModel::toggleFavorite,
+                    onAddCustom = viewModel::addCustomStation,
+                    onSearch = viewModel::searchStations,
+                    onLoadPopular = viewModel::loadPopularStations,
+                    onPlayTracks = viewModel::playTracks,
+                    onLoadTracks = viewModel::loadTracks,
+                    storagePermission = viewModel.storagePermission(),
+                    onTogglePlay = viewModel::radioToggle,
+                    onNext = viewModel::radioNext,
+                    onPrevious = viewModel::radioPrevious,
+                ),
+                modifier = content,
+            )
+            Screen.Gauges -> GaugesScreen(
+                vehicleConnection, vehicleStats, vehicleProfile,
+                onConnect = rememberObdConnector(connectActions), onDemo = connectActions.onDemo,
+                onBack = { screen = Screen.Home }, modifier = content,
+            )
+            Screen.Tpms -> TpmsScreen(
+                tpms,
+                TpmsActions(
+                    onBack = { screen = Screen.Home },
+                    enabled = tpmsEnabled,
+                    hasPermission = viewModel::hasTpmsPermission,
+                    onEnable = viewModel::setTpmsEnabled,
+                    onAssign = viewModel::assignTpms,
+                    onForget = viewModel::forgetTpms,
+                    onLimits = viewModel::setTpmsLimits,
+                ),
+                content,
+            )
+            Screen.Service -> ServiceScreen(
+                reminders, odometer, odometerFromCar = vehicleStats.odometerKm != null,
+                actions = ServiceActions(
+                    onBack = { screen = Screen.Home },
+                    onSetOdometer = viewModel::setOdometer,
+                    onDone = viewModel::markReminderDone,
+                    onSave = viewModel::saveReminder,
+                    onDelete = viewModel::deleteReminder,
+                ),
+                modifier = content,
+            )
             Screen.EditWidgets -> WidgetEditorScreen(
                 widgets = widgets,
                 selectedSlot = editedSlot,
@@ -274,6 +405,7 @@ fun OpentaimentApp(viewModel: HomeViewModel, isDefaultHome: () -> Boolean) {
 }
 
 private fun Double.fmtKmh() = String.format(java.util.Locale("pl"), "%.0f", this)
+private fun Double.fmtBar() = String.format(java.util.Locale("pl"), "%.1f", this)
 
 @Composable
 private fun ScreenBackRow(title: String, onBack: () -> Unit) {
@@ -286,9 +418,29 @@ private fun ScreenBackRow(title: String, onBack: () -> Unit) {
     }
 }
 
+/** Live data for the newer tiles (radio, tyres, service). */
+internal class TileExtras(
+    val player: PlayerState = PlayerState(),
+    val tpms: TpmsState? = null,
+    val reminders: List<ReminderStatus> = emptyList(),
+)
+
 /** Live one-liners under some tiles. */
-internal fun tileSubtitle(tile: BuiltinTile, connection: ConnectionState, stats: VehicleStats, diagnostics: DiagnosticsState): String? =
+internal fun tileSubtitle(
+    tile: BuiltinTile,
+    connection: ConnectionState,
+    stats: VehicleStats,
+    diagnostics: DiagnosticsState,
+    extras: TileExtras = TileExtras(),
+): String? =
     when (tile) {
+        BuiltinTile.RADIO -> extras.player.takeIf { it.isPlaying }?.title
+        BuiltinTile.TPMS -> extras.tpms?.let { t ->
+            t.problems.firstOrNull()?.let { (w, p) -> "⚠️ ${w.short}: ${p.label.lowercase()}" }
+                ?: t.wheels.mapNotNull { it.reading?.pressureBar }.takeIf { it.isNotEmpty() }
+                    ?.let { list -> "${list.min().fmtBar()}–${list.max().fmtBar()} bar" }
+        }
+        BuiltinTile.SERVICE -> extras.reminders.firstOrNull { it.level != ReminderLevel.OK }?.let { "${it.reminder.name}: ${it.label}" }
         BuiltinTile.STATS -> if (connection is ConnectionState.Connected) stats.shortSummary() else null
         BuiltinTile.DRIVE -> if (connection is ConnectionState.Connected) stats.speedKmh?.let { "${it.fmtKmh()} km/h" } else null
         BuiltinTile.DIAGNOSTICS -> when (diagnostics) {
@@ -307,6 +459,7 @@ internal fun homeTiles(
     diagnostics: DiagnosticsState,
     onBuiltin: (BuiltinTile) -> Unit,
     onApp: (String) -> Unit,
+    extras: TileExtras = TileExtras(),
 ): List<HomeTile> = ids.mapNotNull { id ->
     val pkg = TileIds.packageOf(id)
     if (pkg != null) {
@@ -320,7 +473,7 @@ internal fun homeTiles(
                 id = id,
                 label = tile.label,
                 icon = TileIcon.Vector(tile.icon),
-                subtitle = tileSubtitle(tile, connection, stats, diagnostics),
+                subtitle = tileSubtitle(tile, connection, stats, diagnostics, extras),
                 onClick = { onBuiltin(tile) },
             )
         }

@@ -16,6 +16,8 @@ data class ObdSample(
     val fuelRateLh: Double? = null,
     val fuelLevelPct: Double? = null,
     val voltage: Double? = null,
+    val baroKpa: Double? = null,
+    val odometerKm: Double? = null,
 ) {
     /** Keeps the last known value for anything [newer] didn't read (slow PIDs are polled less often). */
     fun mergedWith(newer: ObdSample) = ObdSample(
@@ -33,6 +35,8 @@ data class ObdSample(
         fuelRateLh = newer.fuelRateLh ?: fuelRateLh,
         fuelLevelPct = newer.fuelLevelPct ?: fuelLevelPct,
         voltage = newer.voltage ?: voltage,
+        baroKpa = newer.baroKpa ?: baroKpa,
+        odometerKm = newer.odometerKm ?: odometerKm,
     )
 }
 
@@ -106,6 +110,11 @@ data class VehicleStats(
     val ambientTempC: Double? = null,
     val fuelLevelPct: Double? = null,
     val voltage: Double? = null,
+    val intakeMapKpa: Double? = null,
+    /** Turbo boost: intake pressure above the outside air, kPa (negative = vacuum). */
+    val boostKpa: Double? = null,
+    /** From the car (PID A6) when it reports it. */
+    val odometerKm: Double? = null,
     val fuelRateLh: Double? = null,
     val fuelSource: FuelSource = FuelSource.NONE,
     val instantLPer100Km: Double? = null,

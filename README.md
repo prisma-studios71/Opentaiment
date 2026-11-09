@@ -84,16 +84,74 @@ od tego zależą koszt, moc i spalanie.
 | ![Wyścig](app-phone/src/test/snapshots/images/app.opentaiment.phone_PhoneScreenshotTest_race.png) | ![Ustawienia](app-phone/src/test/snapshots/images/app.opentaiment.phone_PhoneScreenshotTest_settingsGreen.png) | ![Więcej](app-phone/src/test/snapshots/images/app.opentaiment.phone_PhoneScreenshotTest_more.png) |
 | Wyścig | Ustawienia | Więcej |
 
-## Tryb dodatkowy: tablet albo radio z Androidem
+## Radio z Androidem (albo tablet w desce)
 
-Dla aut bez Android Auto ten sam kod działa jako pełnoekranowy launcher na tablecie
-(`app-headunit`): zegar, pogoda, sterowanie muzyką z dowolnej apki, edytowalne kafelki
-i wszystkie ekrany OBD. APK: artefakt `opentaiment-tablet-debug`.
+Dla aut bez Android Auto ten sam kod działa jako **pełnoprawne radio samochodowe** (`app-headunit`):
+launcher na cały ekran, radio internetowe, muzyka z pendrive'a, wszystkie ekrany OBD i rzeczy,
+których potrzebuje radio na stałe w aucie – start z zapłonem, przyciski na kierownicy,
+głośność zależna od prędkości. APK: artefakt `opentaiment-tablet-debug`.
 
 | | |
 |---|---|
-| ![Tablet](app-headunit/src/test/snapshots/images/app.opentaiment.headunit_HomeScreenScreenshotTest_homeLandscapePlaying.png) | ![Tablet nocą](app-headunit/src/test/snapshots/images/app.opentaiment.headunit_TabletExtrasScreenshotTest_homeNightWithAlert.png) |
-| ![Statystyki](app-headunit/src/test/snapshots/images/app.opentaiment.headunit_StatsScreenScreenshotTest_statsDemoDriving.png) | ![Trasy](app-headunit/src/test/snapshots/images/app.opentaiment.headunit_TabletExtrasScreenshotTest_trips.png) |
+| ![Ekran główny](app-headunit/src/test/snapshots/images/app.opentaiment.headunit_CarRadioScreenshotTest_homeCarRadio.png) | ![Radio](app-headunit/src/test/snapshots/images/app.opentaiment.headunit_CarRadioScreenshotTest_radio.png) |
+| Ekran główny: nawigacja, opony, radio | Radio internetowe |
+| ![Zegary](app-headunit/src/test/snapshots/images/app.opentaiment.headunit_CarRadioScreenshotTest_gauges.png) | ![Opony](app-headunit/src/test/snapshots/images/app.opentaiment.headunit_CarRadioScreenshotTest_tyres.png) |
+| Zegary | Ciśnienie w oponach (TPMS) |
+| ![Serwis](app-headunit/src/test/snapshots/images/app.opentaiment.headunit_CarRadioScreenshotTest_service.png) | ![Muzyka z plików](app-headunit/src/test/snapshots/images/app.opentaiment.headunit_CarRadioScreenshotTest_musicFiles.png) |
+| Przypomnienia serwisowe | Muzyka z pendrive'a / karty |
+| ![Ustawienia radia](app-headunit/src/test/snapshots/images/app.opentaiment.headunit_CarRadioScreenshotTest_carSettings.png) | ![Noc](app-headunit/src/test/snapshots/images/app.opentaiment.headunit_CarRadioScreenshotTest_homeServiceWidget.png) |
+| Ustawienia radia | Noc, widżet serwisu |
+
+**Radio i muzyka**
+- **Radio internetowe** z katalogu [radio-browser.info](https://www.radio-browser.info) (~50 tys. stacji, bez konta i klucza):
+  popularne w Polsce, wyszukiwarka, ulubione, własny adres strumienia (MP3/AAC/HLS)
+- Tytuł utworu z metadanych stacji, automatyczne wznawianie po zerwaniu internetu (tunele, słaby zasięg)
+- **Muzyka z pamięci, karty SD i pendrive'a** – po folderach, „graj folder”, losowo
+- Własna sesja multimediów: przyciski na kierownicy, powiadomienie i ekran blokady sterują radiem;
+  następny/poprzedni przełącza ulubione stacje
+- Pauza na komunikaty nawigacji i rozmowy (audio focus)
+
+**Jak fabryczne radio**
+- **Start razem z autem** – po włączeniu radia łączy się z OBD i włącza ostatnią stację
+- **Zapłon = zasilanie USB** (tablet na ładowarce): odcięcie prądu zapisuje trasę i pauzuje muzykę
+- Trasa jest zapisywana co 20 s, więc nagłe odcięcie prądu jej nie zgubi
+- **Przyciski na kierownicy**: „Naucz przycisk” → wciśnij → wybierz akcję (graj/pauza, następna, głośniej,
+  nawigacja, prowadź do domu, radio, telefon, asystent…). Z usługą dostępności działa też nad innymi aplikacjami
+- **Głośność zależna od prędkości** (lekko / średnio / mocno) – z OBD, a bez niego z GPS
+- **Jasność ekranu na dzień i noc** dla całego systemu, nie tylko Opentaiment
+- **Dymek nad nawigacją** – prędkość i spalanie nad Mapami/Waze, czerwony przy ostrzeżeniu
+- Widżet **Nawigacja**: do domu, do pracy, stacje paliw w pobliżu (Mapy Google, Waze albo dowolna apka z mapą)
+
+**Auto**
+- **Adaptery OBD na BLE** (Vgate iCar Pro BLE, OBDLink CX i klony „ELM327 BLE”) – wyszukiwanie bez parowania
+- **Samo łączy się ponownie** po zerwaniu połączenia z adapterem (np. przy odpalaniu), trasa się nie urywa
+- **Zegary** jak w sportowym aucie: obroty, prędkość, doładowanie turbo, temperatura płynu i oleju, napięcie
+- **Ciśnienie w oponach** z tanich czujników TPMS na Bluetooth (BLE): 4 koła, ostrzeżenia o niskim ciśnieniu,
+  temperaturze, wycieku i słabej baterii, przypisywanie czujników do kół
+- **Przypomnienia serwisowe**: olej, przegląd, OC, rozrząd, płyn hamulcowy (+ własne) – po kilometrach i datach.
+  Przebieg z auta (PID A6, nowsze auta) albo z Twojego odczytu + przejechane trasy
+- **Ślad GPS każdej trasy** z mapką (kolor = prędkość), **eksport GPX** i **eksport wszystkich tras do CSV**
+  (otwiera się wprost w Excelu)
+
+### Jak ustawić radio
+
+1. Zainstaluj APK i ustaw Opentaiment jako ekran główny (Android zapyta po wciśnięciu „Home”).
+2. **Ustawienia → Radio samochodowe**: włącz to, czego chcesz. Przy jasności, dymku i przyciskach
+   Android poprosi o osobne zgody („Modyfikowanie ustawień systemu”, „Wyświetlanie nad innymi aplikacjami”,
+   usługa dostępności „Opentaiment – przyciski na kierownicy”).
+3. Głośność od prędkości bez OBD i ślad GPS tras potrzebują **dokładnej lokalizacji**.
+4. Czujniki opon: **Opony → Czujniki TPMS**. Czujniki z numerami 1–4 przypiszą się same.
+
+## Uczciwie o ograniczeniach (radio)
+
+- **Przyciski na kierownicy** w części chińskich radyj (MCU) nie docierają do Androida jako zwykłe klawisze –
+  wtedy przypisz je w ustawieniach producenta do przycisków multimediów, a Opentaiment je zobaczy.
+- **Zapłon**: radia, które przy zgaszeniu auta tylko „usypiają”, nie wysyłają sygnału startu – Opentaiment łączy się
+  ponownie po wybudzeniu ekranu. Opcja „Zapłon = zasilanie USB” jest dla tabletów na ładowarce.
+- Czujniki TPMS: obsługiwany jest najpopularniejszy format tanich czujników BLE („TPMS II”). Fabryczne czujniki
+  auta (433 MHz) wymagają innego odbiornika.
+- Mapka trasy to sam kształt przejazdu (bez podkładu mapy, działa offline) – ulice zobaczysz po otwarciu GPX w apce z mapą.
+- Radio internetowe zużywa ~60 MB transferu na godzinę przy 128 kbps.
 
 ## Uczciwie o ograniczeniach
 
@@ -108,9 +166,10 @@ i wszystkie ekrany OBD. APK: artefakt `opentaiment-tablet-debug`.
 ```
 app-phone/        aplikacja na telefon (zakładki, usługa w tle, powiadomienia)
 car/              ekrany Android Auto (Car App Library 1.7)
-app-headunit/     launcher na tablet / radio
+app-headunit/     radio z Androidem / tablet: launcher, usługa w tle, zapłon, kierownica, głośność, jasność
 core/ui/          motywy, tryb nocny, komponenty
-feature/vehicle/  OBD-II (ELM327), obliczenia, historia, alerty, wyścig, ekrany Compose
+feature/vehicle/  OBD-II (ELM327 BT/BLE), obliczenia, historia + ślad GPS, alerty, TPMS, serwis, wyścig, ekrany Compose
+feature/player/   radio internetowe i odtwarzacz plików (Media3)
 feature/media|weather|apps/   moduły tabletu
 ```
 

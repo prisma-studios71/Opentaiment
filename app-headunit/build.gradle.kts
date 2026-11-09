@@ -13,8 +13,8 @@ android {
         applicationId = "app.opentaiment.headunit"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.3.0"
+        versionCode = 3
+        versionName = "0.4.0"
     }
 
     buildTypes {
@@ -46,6 +46,7 @@ dependencies {
     implementation(project(":feature:weather"))
     implementation(project(":feature:apps"))
     implementation(project(":feature:vehicle"))
+    implementation(project(":feature:player"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

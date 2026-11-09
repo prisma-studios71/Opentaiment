@@ -32,6 +32,10 @@ import app.opentaiment.feature.vehicle.data.dtcCountLabel
 import app.opentaiment.feature.weather.WeatherCard
 import app.opentaiment.feature.weather.WeatherState
 import app.opentaiment.headunit.tiles.HomeWidget
+import app.opentaiment.feature.player.PlayerState
+import app.opentaiment.feature.player.RadioStation
+import app.opentaiment.feature.vehicle.data.ReminderStatus
+import app.opentaiment.feature.vehicle.tpms.TpmsState
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -46,6 +50,13 @@ class WidgetData(
     val stats: VehicleStats = VehicleStats(),
     val diagnostics: DiagnosticsState = DiagnosticsState.Idle,
     val trips: List<TripRecord> = emptyList(),
+    val player: PlayerState = PlayerState(),
+    val favorites: List<RadioStation> = emptyList(),
+    val tpms: TpmsState = TpmsState(),
+    val tpmsEnabled: Boolean = false,
+    val reminders: List<ReminderStatus> = emptyList(),
+    val homeAddress: String = "",
+    val workAddress: String = "",
 ) {
     val carConnected: Boolean get() = connection is ConnectionState.Connected && stats.hasData
 }
@@ -61,6 +72,17 @@ class WidgetActions(
     val onOpenStats: () -> Unit = {},
     val onOpenDiagnostics: () -> Unit = {},
     val onOpenTrips: () -> Unit = {},
+    val onOpenRadio: () -> Unit = {},
+    val onPlayStation: (RadioStation, List<RadioStation>) -> Unit = { _, _ -> },
+    val onRadioToggle: () -> Unit = {},
+    val onRadioNext: () -> Unit = {},
+    val onRadioPrevious: () -> Unit = {},
+    val onOpenNavigation: () -> Unit = {},
+    val onNavigateHome: () -> Unit = {},
+    val onNavigateWork: () -> Unit = {},
+    val onSearchNearby: (String) -> Unit = {},
+    val onOpenTpms: () -> Unit = {},
+    val onOpenService: () -> Unit = {},
 )
 
 private val PL = Locale("pl")
@@ -152,6 +174,10 @@ fun WidgetView(widget: HomeWidget, data: WidgetData, actions: WidgetActions, mod
                 onClick = actions.onOpenDiagnostics, modifier = modifier,
             )
         }
+        HomeWidget.RADIO -> RadioWidget(data, actions, modifier)
+        HomeWidget.NAVIGATION -> NavigationWidget(data, actions, modifier)
+        HomeWidget.TPMS -> TpmsWidget(data, actions, modifier)
+        HomeWidget.SERVICE -> ServiceWidget(data, actions, modifier)
         HomeWidget.WEEK -> {
             val w = TripSummaries.thisWeek(data.trips)
             MetricCard(
