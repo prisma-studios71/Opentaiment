@@ -16,6 +16,19 @@ Otwarty system infotainment do samochodu dla Androida i Android Auto.
 - Tryb launchera (można ustawić jako ekran główny), ekran nie gaśnie, ukryte paski systemowe
 - Układ poziomy i pionowy
 
+## Screeny (v0.1)
+
+| | |
+|---|---|
+| ![Gra muzyka](app-headunit/src/test/snapshots/images/app.opentaiment.headunit_HomeScreenScreenshotTest_homeLandscapePlaying.png) | ![Pauza, noc](app-headunit/src/test/snapshots/images/app.opentaiment.headunit_HomeScreenScreenshotTest_homeLandscapePaused.png) |
+| Gra muzyka, zimno → ostrzeżenie o śliskiej drodze | Pauza, wieczór, bezchmurnie |
+| ![Nic nie gra](app-headunit/src/test/snapshots/images/app.opentaiment.headunit_HomeScreenScreenshotTest_homeLandscapeNothingPlaying.png) | ![Brak dostępu](app-headunit/src/test/snapshots/images/app.opentaiment.headunit_HomeScreenScreenshotTest_homeLandscapeNoMediaAccess.png) |
+| Nic nie gra | Pierwsze uruchomienie – trzeba dać dostęp do muzyki |
+| ![Lista aplikacji](app-headunit/src/test/snapshots/images/app.opentaiment.headunit_HomeScreenScreenshotTest_appDrawer.png) | ![Pion](app-headunit/src/test/snapshots/images/app.opentaiment.headunit_HomeScreenScreenshotTest_homePortraitPlaying.png) |
+| Lista aplikacji z wyszukiwarką | Tablet w pionie |
+
+Screeny są generowane z kodu (Paparazzi, bez emulatora): `./gradlew :app-headunit:recordPaparazziDebug`
+
 ## Instalacja na tablecie
 
 1. Pobierz APK z zakładki **Actions → ostatni build → artefakt `opentaiment-headunit-debug`**

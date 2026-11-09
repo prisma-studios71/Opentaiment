@@ -23,15 +23,15 @@ import kotlin.math.roundToInt
 @Composable
 fun WeatherCard(state: WeatherState, onRefresh: () -> Unit, modifier: Modifier = Modifier) {
     OtCard(modifier, onClick = onRefresh) {
-        when (state) {
-            WeatherState.Loading -> CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally))
-            WeatherState.Error -> {
-                Text("Pogoda", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.height(8.dp))
-                Text("Brak danych – stuknij, żeby spróbować ponownie", style = MaterialTheme.typography.bodyLarge)
-            }
-            is WeatherState.Ready -> Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center) {
-                WeatherContent(state.weather)
+        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center) {
+            when (state) {
+                WeatherState.Loading -> CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally))
+                WeatherState.Error -> {
+                    Text("Pogoda", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.height(8.dp))
+                    Text("Brak danych – stuknij, żeby spróbować ponownie", style = MaterialTheme.typography.bodyLarge)
+                }
+                is WeatherState.Ready -> WeatherContent(state.weather)
             }
         }
     }
