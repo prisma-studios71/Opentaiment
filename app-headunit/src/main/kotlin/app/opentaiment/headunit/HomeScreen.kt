@@ -1,27 +1,29 @@
 package app.opentaiment.headunit
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Apps
-import androidx.compose.material.icons.rounded.Bluetooth
-import androidx.compose.material.icons.rounded.MusicNote
-import androidx.compose.material.icons.rounded.Navigation
-import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material.icons.rounded.Speed
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import app.opentaiment.core.ui.ActionTile
 import app.opentaiment.core.ui.OtCard
+import app.opentaiment.core.ui.TileIcon
 import app.opentaiment.feature.media.MediaPanel
 import app.opentaiment.feature.media.NowPlaying
 import app.opentaiment.feature.weather.WeatherCard
@@ -37,11 +39,16 @@ class HomeActions(
     val onNext: () -> Unit,
     val onPrevious: () -> Unit,
     val onOpenPlayer: () -> Unit,
-    val onNavigation: () -> Unit,
-    val onStats: () -> Unit,
-    val onApps: () -> Unit,
-    val onBluetooth: () -> Unit,
-    val onSettings: () -> Unit,
+    val onEditTiles: () -> Unit,
+)
+
+/** A tile ready to draw on the home screen. */
+class HomeTile(
+    val id: String,
+    val label: String,
+    val icon: TileIcon,
+    val subtitle: String? = null,
+    val onClick: () -> Unit,
 )
 
 private val gap = 20.dp
@@ -52,8 +59,8 @@ fun HomeScreen(
     weather: WeatherState,
     nowPlaying: NowPlaying?,
     hasMediaAccess: Boolean,
+    tiles: List<HomeTile>,
     actions: HomeActions,
-    vehicleSummary: String? = null,
     modifier: Modifier = Modifier,
 ) {
     val media: @Composable (Modifier) -> Unit = { m ->
@@ -74,20 +81,25 @@ fun HomeScreen(
             // Landscape – typical tablet on a dashboard mount.
             Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(gap)) {
                 Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(gap)) {
-                    ClockCard(now, Modifier.weight(1f).fillMaxWidth())
+                    ClockCard(now, actions.onEditTiles, Modifier.weight(1f).fillMaxWidth())
                     WeatherCard(weather, actions.onRefreshWeather, Modifier.weight(1.2f).fillMaxWidth())
                 }
                 media(Modifier.weight(1.5f).fillMaxHeight())
-                QuickActions(actions, vehicleSummary, columns = 2, modifier = Modifier.weight(1f).fillMaxHeight())
+                TileGrid(tiles, columns = 2, onEdit = actions.onEditTiles, modifier = Modifier.weight(1f).fillMaxHeight())
             }
         } else {
             Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(gap)) {
                 Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(gap)) {
-                    ClockCard(now, Modifier.weight(1f).fillMaxHeight())
+                    ClockCard(now, actions.onEditTiles, Modifier.weight(1f).fillMaxHeight())
                     WeatherCard(weather, actions.onRefreshWeather, Modifier.weight(1f).fillMaxHeight())
                 }
                 media(Modifier.weight(1.4f).fillMaxWidth())
-                QuickActions(actions, vehicleSummary, columns = 3, modifier = Modifier.weight(0.9f).fillMaxWidth())
+                TileGrid(
+                    tiles,
+                    columns = if (tiles.size <= 6) 3 else 4,
+                    onEdit = actions.onEditTiles,
+                    modifier = Modifier.weight(0.9f).fillMaxWidth(),
+                )
             }
         }
     }
@@ -97,43 +109,49 @@ private val timeFormat = DateTimeFormatter.ofPattern("HH:mm")
 private val dateFormat = DateTimeFormatter.ofPattern("EEEE, d MMMM", Locale("pl"))
 
 @Composable
-private fun ClockCard(now: LocalDateTime, modifier: Modifier = Modifier) {
+private fun ClockCard(now: LocalDateTime, onEditTiles: () -> Unit, modifier: Modifier = Modifier) {
     OtCard(modifier) {
-        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center) {
-            Text(now.format(timeFormat), style = MaterialTheme.typography.displayLarge, maxLines = 1)
-            Text(
-                now.format(dateFormat).replaceFirstChar { it.titlecase(Locale("pl")) },
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-            )
+        Box(Modifier.fillMaxSize()) {
+            Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center) {
+                Text(now.format(timeFormat), style = MaterialTheme.typography.displayLarge, maxLines = 1)
+                Text(
+                    now.format(dateFormat).replaceFirstChar { it.titlecase(Locale("pl")) },
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                )
+            }
+            IconButton(onClick = onEditTiles, modifier = Modifier.align(Alignment.TopEnd).size(56.dp)) {
+                Icon(
+                    Icons.Rounded.Edit, contentDescription = "Edytuj kafelki",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
 
-private data class Shortcut(
-    val icon: ImageVector,
-    val label: String,
-    val onClick: () -> Unit,
-    val subtitle: String? = null,
-)
-
 @Composable
-private fun QuickActions(actions: HomeActions, vehicleSummary: String?, columns: Int, modifier: Modifier = Modifier) {
-    val shortcuts = listOf(
-        Shortcut(Icons.Rounded.Navigation, "Nawigacja", actions.onNavigation),
-        Shortcut(Icons.Rounded.MusicNote, "Muzyka", actions.onOpenPlayer),
-        Shortcut(Icons.Rounded.Speed, "Statystyki", actions.onStats, vehicleSummary),
-        Shortcut(Icons.Rounded.Apps, "Aplikacje", actions.onApps),
-        Shortcut(Icons.Rounded.Bluetooth, "Bluetooth", actions.onBluetooth),
-        Shortcut(Icons.Rounded.Settings, "Ustawienia", actions.onSettings),
-    )
+private fun TileGrid(tiles: List<HomeTile>, columns: Int, onEdit: () -> Unit, modifier: Modifier = Modifier) {
+    if (tiles.isEmpty()) {
+        ActionTile(TileIcon.Vector(Icons.Rounded.Add), "Dodaj kafelki", onEdit, modifier)
+        return
+    }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(gap)) {
-        shortcuts.chunked(columns).forEach { row ->
+        tiles.chunked(columns).forEach { row ->
             Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(gap)) {
-                row.forEach { s ->
-                    ActionTile(s.icon, s.label, s.onClick, Modifier.weight(1f).fillMaxHeight(), subtitle = s.subtitle)
+                row.forEach { tile ->
+                    ActionTile(
+                        icon = tile.icon,
+                        label = tile.label,
+                        onClick = tile.onClick,
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                        subtitle = tile.subtitle,
+                        onLongClick = onEdit,
+                    )
                 }
+                // Keep tiles in a short last row the same size as the others.
+                repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
             }
         }
     }

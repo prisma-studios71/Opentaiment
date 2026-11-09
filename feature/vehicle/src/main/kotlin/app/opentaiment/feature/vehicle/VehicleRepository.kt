@@ -8,21 +8,26 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
+import app.opentaiment.feature.vehicle.data.DtcReport
 import app.opentaiment.feature.vehicle.data.FuelType
 import app.opentaiment.feature.vehicle.data.TripCalculator
 import app.opentaiment.feature.vehicle.data.VehicleProfile
 import app.opentaiment.feature.vehicle.data.VehicleStats
 import app.opentaiment.feature.vehicle.obd.BluetoothObdTransport
 import app.opentaiment.feature.vehicle.source.ObdDataSource
+import app.opentaiment.feature.vehicle.source.ObdRequest
 import app.opentaiment.feature.vehicle.source.SimulatedDataSource
 import app.opentaiment.feature.vehicle.source.VehicleDataSource
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 import java.util.Locale
 
 data class ObdDevice(val name: String, val address: String) {
@@ -39,6 +44,14 @@ sealed interface ConnectionState {
     data class Connecting(val deviceName: String) : ConnectionState
     data class Connected(val deviceName: String, val demo: Boolean) : ConnectionState
     data class Failed(val message: String) : ConnectionState
+}
+
+sealed interface DiagnosticsState {
+    data object Idle : DiagnosticsState
+    data object Reading : DiagnosticsState
+    data object Clearing : DiagnosticsState
+    data class Ready(val report: DtcReport) : DiagnosticsState
+    data class Failed(val message: String, val previous: DtcReport?) : DiagnosticsState
 }
 
 /**
@@ -60,7 +73,11 @@ class VehicleRepository(context: Context, private val scope: CoroutineScope) {
     private val _profile = MutableStateFlow(calculator.profile)
     val profile: StateFlow<VehicleProfile> = _profile.asStateFlow()
 
+    private val _diagnostics = MutableStateFlow<DiagnosticsState>(DiagnosticsState.Idle)
+    val diagnostics: StateFlow<DiagnosticsState> = _diagnostics.asStateFlow()
+
     private var job: Job? = null
+    private var requests: Channel<ObdRequest>? = null
 
     fun hasBluetoothPermission(): Boolean =
         Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
@@ -101,7 +118,58 @@ class VehicleRepository(context: Context, private val scope: CoroutineScope) {
     fun disconnect() {
         job?.cancel()
         job = null
+        requests?.close()
+        requests = null
         _connection.value = ConnectionState.Disconnected
+    }
+
+    /** Reads trouble codes over the open connection. */
+    fun readDtcs() {
+        val channel = requests ?: return
+        if (_diagnostics.value == DiagnosticsState.Reading || _diagnostics.value == DiagnosticsState.Clearing) return
+        val previous = lastReport()
+        _diagnostics.value = DiagnosticsState.Reading
+        scope.launch {
+            val request = ObdRequest.ReadDtcs()
+            _diagnostics.value = try {
+                channel.send(request)
+                DiagnosticsState.Ready(withTimeout(DTC_TIMEOUT_MS) { request.result.await() })
+            } catch (e: TimeoutCancellationException) {
+                DiagnosticsState.Failed("Auto nie odpowiedziało na czas", previous)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                DiagnosticsState.Failed(e.message ?: "Nie udało się odczytać błędów", previous)
+            }
+        }
+    }
+
+    /** Clears trouble codes (turns Check Engine off), then reads them again. */
+    fun clearDtcs() {
+        val channel = requests ?: return
+        val previous = lastReport()
+        _diagnostics.value = DiagnosticsState.Clearing
+        scope.launch {
+            val request = ObdRequest.ClearDtcs()
+            try {
+                channel.send(request)
+                withTimeout(DTC_TIMEOUT_MS) { request.result.await() }
+                _diagnostics.value = DiagnosticsState.Idle
+                readDtcs()
+            } catch (e: TimeoutCancellationException) {
+                _diagnostics.value = DiagnosticsState.Failed("Auto nie odpowiedziało na czas", previous)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _diagnostics.value = DiagnosticsState.Failed(e.message ?: "Nie udało się skasować błędów", previous)
+            }
+        }
+    }
+
+    private fun lastReport(): DtcReport? = when (val d = _diagnostics.value) {
+        is DiagnosticsState.Ready -> d.report
+        is DiagnosticsState.Failed -> d.previous
+        else -> null
     }
 
     fun resetTrip() {
@@ -121,20 +189,33 @@ class VehicleRepository(context: Context, private val scope: CoroutineScope) {
 
     private fun start(name: String, demo: Boolean, source: VehicleDataSource) {
         job?.cancel()
+        requests?.close()
+        val channel = Channel<ObdRequest>(Channel.UNLIMITED)
+        requests = channel
+        _diagnostics.value = DiagnosticsState.Idle
         _connection.value = if (demo) ConnectionState.Connected(name, demo = true) else ConnectionState.Connecting(name)
         job = scope.launch {
             try {
-                source.samples().collect { sample ->
+                var first = true
+                source.samples(channel).collect { sample ->
                     if (_connection.value !is ConnectionState.Connected) {
                         _connection.value = ConnectionState.Connected(name, demo)
                     }
                     _stats.value = calculator.add(sample)
+                    if (first) {
+                        first = false
+                        readDtcs() // check for trouble codes right away, so the home tile can warn
+                    }
                 }
                 _connection.value = ConnectionState.Disconnected
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 _connection.value = ConnectionState.Failed(e.message ?: "Nie udało się połączyć z adapterem")
+            } finally {
+                // Link is gone: nobody will answer queued requests any more.
+                channel.close()
+                if (requests === channel) requests = null
             }
         }
     }
@@ -156,5 +237,6 @@ class VehicleRepository(context: Context, private val scope: CoroutineScope) {
         const val KEY_FUEL = "fuel"
         const val KEY_MASS = "mass"
         const val KEY_DISPLACEMENT = "displacement"
+        const val DTC_TIMEOUT_MS = 30_000L
     }
 }

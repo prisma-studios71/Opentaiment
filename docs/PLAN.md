@@ -115,9 +115,11 @@ Sprzęt: najpierw **tablet z Androidem** (tryb Head Unit), potem **auto z Androi
 2. ✅ Design system w `core/ui`
 3. ✅ Launcher na tablet: zegar, pogoda, sterowanie muzyką, skróty, lista aplikacji
 4. ✅ Statystyki z OBD-II (ELM327 Bluetooth): spalanie, moc, moment, przyspieszenie, sprinty, trasa, tryb demo
-5. ⏭️ Ustawienia Opentaiment (adres domowy/praca, wybór domyślnej nawigacji i playera, motyw)
-6. ⏭️ Moduły `app-phone` + `car`: Android Auto (media → POI → dashboard), test na DHU
-7. ⏭️ OBD dalej: adaptery BLE, kody błędów (DTC), historia tras, automatyczne ponowne łączenie
+5. ✅ Diagnostyka: odczyt i kasowanie kodów błędów (DTC), opisy po polsku
+6. ✅ Edytowalne kafelki ekranu głównego (także dowolne aplikacje)
+7. ⏭️ Ustawienia Opentaiment (adres domowy/praca, wybór domyślnej nawigacji i playera, motyw)
+8. ⏭️ Moduły `app-phone` + `car`: Android Auto (media → POI → dashboard), test na DHU
+9. ⏭️ OBD dalej: adaptery BLE, freeze frame, testy gotowości, historia tras, automatyczne ponowne łączenie
 
 Uwaga: obecnie DI jest ręczne (repozytoria tworzone w ViewModelu). Hilt wejdzie razem z `app-phone`,
 kiedy pojawi się drugi konsument tych samych repozytoriów.

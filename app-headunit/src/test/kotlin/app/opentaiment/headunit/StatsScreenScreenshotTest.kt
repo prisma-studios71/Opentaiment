@@ -1,37 +1,34 @@
 package app.opentaiment.headunit
 
-import androidx.activity.compose.LocalActivityResultRegistryOwner
-import androidx.activity.result.ActivityResultRegistry
-import androidx.activity.result.ActivityResultRegistryOwner
-import androidx.activity.result.contract.ActivityResultContract
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.core.app.ActivityOptionsCompat
 import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
-import app.opentaiment.core.ui.OpentaimentTheme
 import app.opentaiment.feature.vehicle.ConnectionState
+import app.opentaiment.feature.vehicle.DiagnosticsState
+import app.opentaiment.feature.vehicle.data.DtcReport
 import app.opentaiment.feature.vehicle.data.TripCalculator
 import app.opentaiment.feature.vehicle.data.VehicleProfile
 import app.opentaiment.feature.vehicle.data.VehicleStats
+import app.opentaiment.feature.vehicle.source.DEMO_DTCS
 import app.opentaiment.feature.vehicle.source.DrivingSimulator
+import app.opentaiment.feature.vehicle.ui.DiagnosticsActions
+import app.opentaiment.feature.vehicle.ui.DiagnosticsScreen
 import app.opentaiment.feature.vehicle.ui.StatsActions
 import app.opentaiment.feature.vehicle.ui.StatsScreen
-import app.opentaiment.feature.vehicle.ui.shortSummary
 import app.opentaiment.feature.weather.Weather
 import app.opentaiment.feature.weather.WeatherState
+import app.opentaiment.headunit.tiles.TileEditorActions
+import app.opentaiment.headunit.tiles.TileEditorScreen
+import app.opentaiment.headunit.tiles.TileIds
 import com.android.resources.ScreenOrientation
 import org.junit.Rule
 import org.junit.Test
 import java.time.LocalDateTime
 
-/** Stats screen fed by the demo simulator. Record: ./gradlew :app-headunit:recordPaparazziDebug */
+/** Stats, diagnostics and tile editor screens. Record: ./gradlew :app-headunit:recordPaparazziDebug */
 class StatsScreenScreenshotTest {
 
     @get:Rule
@@ -40,10 +37,14 @@ class StatsScreenScreenshotTest {
         showSystemUi = false,
     )
 
-    private val actions = StatsActions(
-        onBack = {}, pairedDevices = { emptyList() }, hasBluetoothPermission = { true },
-        onConnect = {}, onDemo = {}, onDisconnect = {}, onResetTrip = {}, onProfileChange = {},
-        onOpenBluetoothSettings = {},
+    private val pad = Modifier.fillMaxSize().padding(20.dp)
+    private val demo = ConnectionState.Connected("Tryb demo", demo = true)
+
+    private val statsActions = StatsActions(
+        onBack = {}, connect = Fixtures.connectActions, onDisconnect = {}, onResetTrip = {}, onProfileChange = {},
+    )
+    private val diagActions = DiagnosticsActions(
+        onBack = {}, connect = Fixtures.connectActions, onRead = {}, onClear = {}, onSearchCode = {},
     )
 
     /** ~1 lap of the demo drive, then 7 s into the next full-throttle launch (0–100 timer running). */
@@ -55,83 +56,76 @@ class StatsScreenScreenshotTest {
     }
 
     @Test
-    fun statsDemoDriving() = render {
-        StatsScreen(
-            connection = ConnectionState.Connected("Tryb demo", demo = true),
-            stats = drivenStats(),
-            profile = VehicleProfile(),
-            actions = actions,
-            modifier = Modifier.fillMaxSize().padding(20.dp),
-        )
+    fun statsDemoDriving() = paparazzi.render {
+        StatsScreen(demo, drivenStats(), VehicleProfile(), statsActions, pad)
     }
 
     @Test
     fun statsPortraitDemoDriving() {
         paparazzi.unsafeUpdateConfig(DeviceConfig.PIXEL_C.copy(orientation = ScreenOrientation.PORTRAIT))
-        render {
-            StatsScreen(
-                connection = ConnectionState.Connected("OBDII", demo = false),
-                stats = drivenStats(),
-                profile = VehicleProfile(),
-                actions = actions,
-                modifier = Modifier.fillMaxSize().padding(20.dp),
-            )
+        paparazzi.render {
+            StatsScreen(ConnectionState.Connected("OBDII", demo = false), drivenStats(), VehicleProfile(), statsActions, pad)
         }
     }
 
     @Test
-    fun statsNotConnected() = render {
+    fun statsNotConnected() = paparazzi.render {
+        StatsScreen(ConnectionState.Disconnected, VehicleStats(), VehicleProfile(), statsActions, pad)
+    }
+
+    @Test
+    fun statsConnectionFailed() = paparazzi.render {
         StatsScreen(
-            connection = ConnectionState.Disconnected,
-            stats = VehicleStats(),
-            profile = VehicleProfile(),
-            actions = actions,
-            modifier = Modifier.fillMaxSize().padding(20.dp),
+            ConnectionState.Failed("Auto nie odpowiada (NO DATA). Czy zapłon jest włączony?"),
+            VehicleStats(), VehicleProfile(), statsActions, pad,
         )
     }
 
     @Test
-    fun statsConnectionFailed() = render {
-        StatsScreen(
-            connection = ConnectionState.Failed("Auto nie odpowiada (NO DATA). Czy zapłon jest włączony?"),
-            stats = VehicleStats(),
-            profile = VehicleProfile(),
-            actions = actions,
-            modifier = Modifier.fillMaxSize().padding(20.dp),
-        )
+    fun diagnosticsWithCodes() = paparazzi.render {
+        DiagnosticsScreen(demo, DiagnosticsState.Ready(DEMO_DTCS), diagActions, pad)
     }
 
     @Test
-    fun homeWithLiveObd() = render {
+    fun diagnosticsClean() = paparazzi.render {
+        DiagnosticsScreen(demo, DiagnosticsState.Ready(DtcReport(false, emptyList(), emptyList(), emptyList())), diagActions, pad)
+    }
+
+    @Test
+    fun diagnosticsReading() = paparazzi.render {
+        DiagnosticsScreen(demo, DiagnosticsState.Reading, diagActions, pad)
+    }
+
+    @Test
+    fun diagnosticsPortraitWithCodes() {
+        paparazzi.unsafeUpdateConfig(DeviceConfig.PIXEL_C.copy(orientation = ScreenOrientation.PORTRAIT))
+        paparazzi.render { DiagnosticsScreen(demo, DiagnosticsState.Ready(DEMO_DTCS), diagActions, pad) }
+    }
+
+    @Test
+    fun homeWithLiveObdAndCustomTiles() = paparazzi.render {
+        val apps = Fixtures.fakeApps()
         HomeScreen(
             now = LocalDateTime.of(2026, 11, 9, 18, 42),
             weather = WeatherState.Ready(Weather(2.4, 3, 14.0, -1.0, 5.0, true, "Warszawa")),
             nowPlaying = null,
             hasMediaAccess = true,
-            actions = HomeActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}),
-            vehicleSummary = drivenStats().shortSummary(),
-            modifier = Modifier.fillMaxSize().padding(20.dp),
+            tiles = Fixtures.tiles(
+                ids = listOf("nav", "music", "stats", "diag", TileIds.app("pkg.waze"), TileIds.app("pkg.spotify"), "apps"),
+                apps = apps,
+                connection = demo,
+                stats = drivenStats(),
+                diagnostics = DiagnosticsState.Ready(DEMO_DTCS),
+            ),
+            actions = Fixtures.homeActions,
+            modifier = pad,
         )
     }
 
-    private fun render(content: @Composable () -> Unit) {
-        paparazzi.snapshot {
-            CompositionLocalProvider(LocalActivityResultRegistryOwner provides NoOpRegistryOwner) {
-                OpentaimentTheme {
-                    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) { content() }
-                }
-            }
-        }
-    }
-
-    private object NoOpRegistryOwner : ActivityResultRegistryOwner {
-        override val activityResultRegistry = object : ActivityResultRegistry() {
-            override fun <I, O> onLaunch(
-                requestCode: Int,
-                contract: ActivityResultContract<I, O>,
-                input: I,
-                options: ActivityOptionsCompat?,
-            ) = Unit
-        }
+    @Test
+    fun tileEditor() = paparazzi.render {
+        val ids = listOf("nav", "music", "stats", "diag", TileIds.app("pkg.spotify"), "apps")
+        val (current, available) = tileOptions(ids, Fixtures.fakeApps())
+        TileEditorScreen(current, available, TileEditorActions({}, {}, { _, _ -> }, {}, {}), pad)
     }
 }

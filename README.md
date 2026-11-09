@@ -12,7 +12,8 @@ Otwarty system infotainment do samochodu dla Androida i Android Auto.
 - Ekran główny: zegar, data, pogoda (Open-Meteo, bez klucza API, ostrzeżenie o śliskiej drodze)
 - Sterowanie muzyką z **dowolnej** aplikacji (Spotify, YouTube Music, Tidal, radio…): okładka, tytuł, postęp, play/pauza/następny/poprzedni
 - **Statystyki z OBD-II** (adapter ELM327 Bluetooth): spalanie chwilowe i średnie, moc i moment (szacowane), przyspieszenie, automatyczny pomiar 0–100 i 80–120 km/h z rekordami, temperatury, napięcie, poziom paliwa, licznik trasy, wykres ostatniej minuty. Jest **tryb demo** bez auta.
-- Skróty: nawigacja (Google Maps → Waze → OsmAnd), muzyka, statystyki, Bluetooth, ustawienia
+- **Diagnostyka (kody błędów)**: stan Check Engine, błędy zapisane / oczekujące / stałe z opisami po polsku, wyszukiwanie kodu w internecie, kasowanie błędów (z ostrzeżeniem). Błędy są sprawdzane od razu po połączeniu z autem.
+- **Edytowalne kafelki**: wybierasz, co jest na ekranie głównym i w jakiej kolejności (do 8), także dowolne aplikacje. Edycja: ołówek na karcie zegara albo przytrzymanie kafelka.
 - Lista aplikacji z wyszukiwarką
 - Tryb launchera (można ustawić jako ekran główny), ekran nie gaśnie, ukryte paski systemowe
 - Układ poziomy i pionowy
@@ -23,7 +24,7 @@ Otwarty system infotainment do samochodu dla Androida i Android Auto.
 
 | | |
 |---|---|
-| ![Bez połączenia](app-headunit/src/test/snapshots/images/app.opentaiment.headunit_StatsScreenScreenshotTest_statsNotConnected.png) | ![Kafelek](app-headunit/src/test/snapshots/images/app.opentaiment.headunit_StatsScreenScreenshotTest_homeWithLiveObd.png) |
+| ![Bez połączenia](app-headunit/src/test/snapshots/images/app.opentaiment.headunit_StatsScreenScreenshotTest_statsNotConnected.png) | ![Kafelek](app-headunit/src/test/snapshots/images/app.opentaiment.headunit_StatsScreenScreenshotTest_homeWithLiveObdAndCustomTiles.png) |
 | Instrukcja podłączenia adaptera | Podczas jazdy kafelek na ekranie głównym pokazuje prędkość i spalanie |
 
 **Co jest potrzebne:** adapter ELM327 na Bluetooth (tzw. „kostka OBD”, ~30–80 zł), wpięty w gniazdo OBD-II
@@ -40,6 +41,20 @@ Adapter jest zapamiętywany i przy następnym starcie aplikacja łączy się sam
 | 0–100, 80–120 | Start/meta interpolowane między próbkami, przerywane gdy odpuścisz gaz |
 
 W *Statystyki → Auto* ustaw rodzaj paliwa, masę i pojemność silnika, bo bez tego moc i spalanie będą mniej dokładne.
+
+## Diagnostyka i kafelki
+
+| | |
+|---|---|
+| ![Diagnostyka](app-headunit/src/test/snapshots/images/app.opentaiment.headunit_StatsScreenScreenshotTest_diagnosticsWithCodes.png) | ![Edycja kafelków](app-headunit/src/test/snapshots/images/app.opentaiment.headunit_StatsScreenScreenshotTest_tileEditor.png) |
+| Kody błędów z opisami | Edycja kafelków |
+| ![Kafelki](app-headunit/src/test/snapshots/images/app.opentaiment.headunit_StatsScreenScreenshotTest_homeWithLiveObdAndCustomTiles.png) | ![Bez błędów](app-headunit/src/test/snapshots/images/app.opentaiment.headunit_StatsScreenScreenshotTest_diagnosticsClean.png) |
+| Własne kafelki (Waze, Spotify) + ostrzeżenie o błędach na kafelku | Auto bez błędów |
+
+Opisy po polsku ma ~80 najczęstszych kodów ogólnych (P0xxx, U0xxx). Pozostałe dostają opis kategorii,
+a kody producenta (P1xxx itp.) – informację, że znaczenie zależy od marki; lupa obok kodu wyszukuje go w sieci.
+Odczytywane są tylko błędy, które sterownik silnika udostępnia przez standardowe OBD-II –
+błędy ABS, poduszek czy klimatyzacji zwykle wymagają protokołów producenta.
 
 ## Screeny (v0.1)
 
@@ -72,7 +87,7 @@ core/ui/           motyw i wspólne komponenty
 feature/media/     sterowanie sesjami mediów
 feature/weather/   pogoda (Open-Meteo)
 feature/apps/      lista aplikacji i skróty
-feature/vehicle/   OBD-II (ELM327), obliczenia, symulator jazdy, ekran statystyk
+feature/vehicle/   OBD-II (ELM327), obliczenia, kody błędów, symulator, ekrany statystyk i diagnostyki
 ```
 
 Testy: `./gradlew testDebugUnitTest` · zrzuty ekranu bez emulatora: `./gradlew :app-headunit:recordPaparazziDebug`

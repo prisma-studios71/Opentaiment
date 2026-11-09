@@ -1,11 +1,14 @@
 package app.opentaiment.feature.vehicle.source
 
 import android.os.SystemClock
+import app.opentaiment.feature.vehicle.data.DtcReport
 import app.opentaiment.feature.vehicle.data.ObdSample
 import app.opentaiment.feature.vehicle.obd.Elm327
 import app.opentaiment.feature.vehicle.obd.ObdPid
 import app.opentaiment.feature.vehicle.obd.ObdTransport
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
@@ -14,8 +17,32 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 
 fun interface VehicleDataSource {
-    /** Cold flow: collecting it connects, cancelling it disconnects. */
-    fun samples(): Flow<ObdSample>
+    /**
+     * Cold flow: collecting it connects, cancelling it disconnects.
+     * [requests] carries one-off commands (read/clear trouble codes) to run on the same link.
+     */
+    fun samples(requests: ReceiveChannel<ObdRequest>): Flow<ObdSample>
+}
+
+/** Runs [request] with [read]/[clear] and completes its deferred, never throwing except on cancel. */
+internal suspend fun handleRequest(
+    request: ObdRequest,
+    read: suspend () -> DtcReport,
+    clear: suspend () -> Unit,
+) {
+    try {
+        when (request) {
+            is ObdRequest.ReadDtcs -> request.result.complete(read())
+            is ObdRequest.ClearDtcs -> request.result.complete(clear())
+        }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        when (request) {
+            is ObdRequest.ReadDtcs -> request.result.completeExceptionally(e)
+            is ObdRequest.ClearDtcs -> request.result.completeExceptionally(e)
+        }
+    }
 }
 
 /** Live data from a real car through an ELM327 adapter. */
@@ -24,7 +51,7 @@ class ObdDataSource(
     private val clock: () -> Long = SystemClock::elapsedRealtime,
 ) : VehicleDataSource {
 
-    override fun samples(): Flow<ObdSample> = flow {
+    override fun samples(requests: ReceiveChannel<ObdRequest>): Flow<ObdSample> = flow {
         val transport = openTransport()
         try {
             val elm = Elm327(transport)
@@ -42,6 +69,9 @@ class ObdDataSource(
             var cycle = 0L
             while (true) {
                 currentCoroutineContext().ensureActive()
+                requests.tryReceive().getOrNull()?.let { request ->
+                    handleRequest(request, read = { elm.readDtcs() }, clear = { elm.clearDtcs() })
+                }
                 val t = clock()
                 val speed = elm.read(ObdPid.SPEED)
                 val rpm = elm.read(ObdPid.RPM)
@@ -82,15 +112,30 @@ class ObdDataSource(
     }
 }
 
-/** Demo mode: a simulated drive, so the stats screen can be tried without a car. */
+/** Demo mode: a simulated drive with a couple of fake trouble codes, so everything can be tried without a car. */
 class SimulatedDataSource(private val stepMs: Long = 200) : VehicleDataSource {
-    override fun samples(): Flow<ObdSample> = flow {
+    override fun samples(requests: ReceiveChannel<ObdRequest>): Flow<ObdSample> = flow {
         val simulator = DrivingSimulator(seed = System.currentTimeMillis())
         val base = SystemClock.elapsedRealtime()
+        var codes = DEMO_DTCS
         while (true) {
             delay(stepMs)
+            requests.tryReceive().getOrNull()?.let { request ->
+                handleRequest(
+                    request,
+                    read = { delay(800); codes }, // feels like talking to a real ECU
+                    clear = { delay(800); codes = DtcReport(milOn = false, emptyList(), emptyList(), emptyList()) },
+                )
+            }
             val s = simulator.next(stepMs)
             emit(s.copy(timeMs = base + s.timeMs))
         }
     }
 }
+
+val DEMO_DTCS = DtcReport(
+    milOn = true,
+    stored = listOf("P0420", "P0301"),
+    pending = listOf("P0171"),
+    permanent = listOf("P0420"),
+)

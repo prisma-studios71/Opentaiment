@@ -1,5 +1,6 @@
 package app.opentaiment.feature.vehicle.obd
 
+import app.opentaiment.feature.vehicle.data.DtcReport
 import java.io.IOException
 import java.util.Locale
 
@@ -37,4 +38,24 @@ class Elm327(private val transport: ObdTransport) {
         Elm327Parser.mode01Data(transport.send(pid.command), pid.code)?.let(pid::decodeOrNull)
 
     suspend fun readVoltage(): Double? = Elm327Parser.voltage(transport.send("ATRV"))
+
+    suspend fun readDtcs(): DtcReport {
+        val isCan = Elm327Parser.isCanProtocol(transport.send("ATDPN"))
+        val status = Elm327Parser.mode01Data(transport.send("0101"), 0x01)
+        fun codes(mode: Int, raw: String) = Elm327Parser.dtcs(raw, mode, isCan)
+        return DtcReport(
+            milOn = status?.firstOrNull()?.let { it and 0x80 != 0 },
+            stored = codes(0x03, transport.send("03", 8_000)),
+            pending = codes(0x07, transport.send("07", 8_000)),
+            permanent = codes(0x0A, transport.send("0A", 8_000)),
+        )
+    }
+
+    /** Mode 04: clears codes, turns Check Engine off and resets readiness monitors. */
+    suspend fun clearDtcs() {
+        val response = transport.send("04", 8_000)
+        if (!response.replace(" ", "").contains("44")) {
+            throw IOException("Sterownik odrzucił kasowanie (${response.trim()}). Wyłącz silnik, zostaw włączony zapłon.")
+        }
+    }
 }

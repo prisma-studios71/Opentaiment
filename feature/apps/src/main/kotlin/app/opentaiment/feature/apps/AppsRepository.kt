@@ -57,6 +57,9 @@ class AppsRepository(context: Context) {
 
     fun openSystemSettings(): Boolean = start(Intent(Settings.ACTION_SETTINGS))
 
+    fun openWebSearch(query: String): Boolean =
+        start(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/search?q=" + Uri.encode(query))))
+
     private fun start(intent: Intent): Boolean = try {
         appContext.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         true

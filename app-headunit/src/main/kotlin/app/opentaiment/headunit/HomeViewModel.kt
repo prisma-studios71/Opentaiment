@@ -8,11 +8,13 @@ import app.opentaiment.feature.apps.AppsRepository
 import app.opentaiment.feature.media.MediaRepository
 import app.opentaiment.feature.media.NowPlaying
 import app.opentaiment.feature.vehicle.ConnectionState
+import app.opentaiment.feature.vehicle.DiagnosticsState
 import app.opentaiment.feature.vehicle.ObdDevice
 import app.opentaiment.feature.vehicle.VehicleRepository
 import app.opentaiment.feature.vehicle.data.VehicleProfile
 import app.opentaiment.feature.vehicle.data.VehicleStats
 import app.opentaiment.feature.weather.WeatherRepository
+import app.opentaiment.headunit.tiles.TilesStore
 import app.opentaiment.feature.weather.WeatherState
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -33,6 +35,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private val weatherRepo = WeatherRepository(app)
     private val appsRepo = AppsRepository(app)
     private val vehicle = VehicleRepository(app, viewModelScope)
+    private val tilesStore = TilesStore(app)
 
     val now: StateFlow<LocalDateTime> = flow {
         while (true) {
@@ -53,6 +56,10 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     val vehicleConnection: StateFlow<ConnectionState> = vehicle.connection
     val vehicleStats: StateFlow<VehicleStats> = vehicle.stats
     val vehicleProfile: StateFlow<VehicleProfile> = vehicle.profile
+    val diagnostics: StateFlow<DiagnosticsState> = vehicle.diagnostics
+
+    /** Ids of tiles on the home screen, in display order. */
+    val tiles: StateFlow<List<String>> = tilesStore.tiles
 
     private var weatherJob: Job? = null
 
@@ -110,9 +117,19 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     fun disconnectObd() = vehicle.disconnect()
     fun resetTrip() = vehicle.resetTrip()
     fun updateVehicleProfile(profile: VehicleProfile) = vehicle.updateProfile(profile)
+    fun readDtcs() = vehicle.readDtcs()
+    fun clearDtcs() = vehicle.clearDtcs()
+    fun searchDtc(code: String) = appsRepo.openWebSearch("$code kod błędu OBD")
+
+    // --- home tiles ---
+    fun addTile(id: String) = tilesStore.add(id)
+    fun removeTile(id: String) = tilesStore.remove(id)
+    fun moveTile(id: String, delta: Int) = tilesStore.move(id, delta)
+    fun resetTiles() = tilesStore.reset()
 
     // --- shortcuts ---
     fun launch(app: AppEntry) = appsRepo.launch(app.packageName)
+    fun launch(packageName: String) = appsRepo.launch(packageName)
     fun openNavigation() = appsRepo.openNavigation()
     fun openDialer() = appsRepo.openDialer()
     fun openBluetooth() = appsRepo.openBluetoothSettings()
