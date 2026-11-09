@@ -7,6 +7,11 @@ import app.opentaiment.feature.apps.AppEntry
 import app.opentaiment.feature.apps.AppsRepository
 import app.opentaiment.feature.media.MediaRepository
 import app.opentaiment.feature.media.NowPlaying
+import app.opentaiment.feature.vehicle.ConnectionState
+import app.opentaiment.feature.vehicle.ObdDevice
+import app.opentaiment.feature.vehicle.VehicleRepository
+import app.opentaiment.feature.vehicle.data.VehicleProfile
+import app.opentaiment.feature.vehicle.data.VehicleStats
 import app.opentaiment.feature.weather.WeatherRepository
 import app.opentaiment.feature.weather.WeatherState
 import kotlinx.coroutines.Job
@@ -27,6 +32,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private val media = MediaRepository(app)
     private val weatherRepo = WeatherRepository(app)
     private val appsRepo = AppsRepository(app)
+    private val vehicle = VehicleRepository(app, viewModelScope)
 
     val now: StateFlow<LocalDateTime> = flow {
         while (true) {
@@ -44,9 +50,14 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private val _apps = MutableStateFlow<List<AppEntry>>(emptyList())
     val apps: StateFlow<List<AppEntry>> = _apps.asStateFlow()
 
+    val vehicleConnection: StateFlow<ConnectionState> = vehicle.connection
+    val vehicleStats: StateFlow<VehicleStats> = vehicle.stats
+    val vehicleProfile: StateFlow<VehicleProfile> = vehicle.profile
+
     private var weatherJob: Job? = null
 
     init {
+        vehicle.autoConnect()
         viewModelScope.launch {
             while (isActive) {
                 loadWeather()
@@ -91,6 +102,15 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         getApplication<Application>().startActivity(media.accessSettingsIntent())
     }
 
+    // --- vehicle / OBD ---
+    fun pairedObdDevices(): List<ObdDevice> = vehicle.pairedDevices()
+    fun hasBluetoothPermission(): Boolean = vehicle.hasBluetoothPermission()
+    fun connectObd(device: ObdDevice) = vehicle.connect(device)
+    fun startVehicleDemo() = vehicle.startDemo()
+    fun disconnectObd() = vehicle.disconnect()
+    fun resetTrip() = vehicle.resetTrip()
+    fun updateVehicleProfile(profile: VehicleProfile) = vehicle.updateProfile(profile)
+
     // --- shortcuts ---
     fun launch(app: AppEntry) = appsRepo.launch(app.packageName)
     fun openNavigation() = appsRepo.openNavigation()
@@ -100,5 +120,6 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     override fun onCleared() {
         media.stop()
+        vehicle.disconnect()
     }
 }

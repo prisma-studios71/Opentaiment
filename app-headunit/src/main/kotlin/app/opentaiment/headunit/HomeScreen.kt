@@ -12,8 +12,8 @@ import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.Bluetooth
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Navigation
-import androidx.compose.material.icons.rounded.Phone
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Speed
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,7 +38,7 @@ class HomeActions(
     val onPrevious: () -> Unit,
     val onOpenPlayer: () -> Unit,
     val onNavigation: () -> Unit,
-    val onPhone: () -> Unit,
+    val onStats: () -> Unit,
     val onApps: () -> Unit,
     val onBluetooth: () -> Unit,
     val onSettings: () -> Unit,
@@ -53,6 +53,7 @@ fun HomeScreen(
     nowPlaying: NowPlaying?,
     hasMediaAccess: Boolean,
     actions: HomeActions,
+    vehicleSummary: String? = null,
     modifier: Modifier = Modifier,
 ) {
     val media: @Composable (Modifier) -> Unit = { m ->
@@ -77,7 +78,7 @@ fun HomeScreen(
                     WeatherCard(weather, actions.onRefreshWeather, Modifier.weight(1.2f).fillMaxWidth())
                 }
                 media(Modifier.weight(1.5f).fillMaxHeight())
-                QuickActions(actions, columns = 2, modifier = Modifier.weight(1f).fillMaxHeight())
+                QuickActions(actions, vehicleSummary, columns = 2, modifier = Modifier.weight(1f).fillMaxHeight())
             }
         } else {
             Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(gap)) {
@@ -86,7 +87,7 @@ fun HomeScreen(
                     WeatherCard(weather, actions.onRefreshWeather, Modifier.weight(1f).fillMaxHeight())
                 }
                 media(Modifier.weight(1.4f).fillMaxWidth())
-                QuickActions(actions, columns = 3, modifier = Modifier.weight(0.9f).fillMaxWidth())
+                QuickActions(actions, vehicleSummary, columns = 3, modifier = Modifier.weight(0.9f).fillMaxWidth())
             }
         }
     }
@@ -110,14 +111,19 @@ private fun ClockCard(now: LocalDateTime, modifier: Modifier = Modifier) {
     }
 }
 
-private data class Shortcut(val icon: ImageVector, val label: String, val onClick: () -> Unit)
+private data class Shortcut(
+    val icon: ImageVector,
+    val label: String,
+    val onClick: () -> Unit,
+    val subtitle: String? = null,
+)
 
 @Composable
-private fun QuickActions(actions: HomeActions, columns: Int, modifier: Modifier = Modifier) {
+private fun QuickActions(actions: HomeActions, vehicleSummary: String?, columns: Int, modifier: Modifier = Modifier) {
     val shortcuts = listOf(
         Shortcut(Icons.Rounded.Navigation, "Nawigacja", actions.onNavigation),
         Shortcut(Icons.Rounded.MusicNote, "Muzyka", actions.onOpenPlayer),
-        Shortcut(Icons.Rounded.Phone, "Telefon", actions.onPhone),
+        Shortcut(Icons.Rounded.Speed, "Statystyki", actions.onStats, vehicleSummary),
         Shortcut(Icons.Rounded.Apps, "Aplikacje", actions.onApps),
         Shortcut(Icons.Rounded.Bluetooth, "Bluetooth", actions.onBluetooth),
         Shortcut(Icons.Rounded.Settings, "Ustawienia", actions.onSettings),
@@ -126,7 +132,7 @@ private fun QuickActions(actions: HomeActions, columns: Int, modifier: Modifier 
         shortcuts.chunked(columns).forEach { row ->
             Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(gap)) {
                 row.forEach { s ->
-                    ActionTile(s.icon, s.label, s.onClick, Modifier.weight(1f).fillMaxHeight())
+                    ActionTile(s.icon, s.label, s.onClick, Modifier.weight(1f).fillMaxHeight(), subtitle = s.subtitle)
                 }
             }
         }

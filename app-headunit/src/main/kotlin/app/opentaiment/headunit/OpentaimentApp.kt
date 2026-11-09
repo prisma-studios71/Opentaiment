@@ -21,8 +21,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.opentaiment.feature.apps.AppDrawer
+import app.opentaiment.feature.vehicle.ConnectionState
+import app.opentaiment.feature.vehicle.ui.StatsActions
+import app.opentaiment.feature.vehicle.ui.StatsScreen
+import app.opentaiment.feature.vehicle.ui.shortSummary
 
-private enum class Screen { Home, Apps }
+private enum class Screen { Home, Apps, Stats }
 
 @Composable
 fun OpentaimentApp(viewModel: HomeViewModel, isDefaultHome: () -> Boolean) {
@@ -47,6 +51,11 @@ fun OpentaimentApp(viewModel: HomeViewModel, isDefaultHome: () -> Boolean) {
     val nowPlaying by viewModel.nowPlaying.collectAsStateWithLifecycle()
     val hasMediaAccess by viewModel.hasMediaAccess.collectAsStateWithLifecycle()
     val apps by viewModel.apps.collectAsStateWithLifecycle()
+    val vehicleConnection by viewModel.vehicleConnection.collectAsStateWithLifecycle()
+    val vehicleStats by viewModel.vehicleStats.collectAsStateWithLifecycle()
+    val vehicleProfile by viewModel.vehicleProfile.collectAsStateWithLifecycle()
+
+    val vehicleSummary = if (vehicleConnection is ConnectionState.Connected) vehicleStats.shortSummary() else null
 
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         val content = Modifier
@@ -60,6 +69,7 @@ fun OpentaimentApp(viewModel: HomeViewModel, isDefaultHome: () -> Boolean) {
                 weather = weather,
                 nowPlaying = nowPlaying,
                 hasMediaAccess = hasMediaAccess,
+                vehicleSummary = vehicleSummary,
                 actions = HomeActions(
                     onRefreshWeather = viewModel::refreshWeather,
                     onGrantMediaAccess = viewModel::grantMediaAccess,
@@ -68,7 +78,7 @@ fun OpentaimentApp(viewModel: HomeViewModel, isDefaultHome: () -> Boolean) {
                     onPrevious = viewModel::previous,
                     onOpenPlayer = viewModel::openPlayer,
                     onNavigation = { viewModel.openNavigation() },
-                    onPhone = { viewModel.openDialer() },
+                    onStats = { screen = Screen.Stats },
                     onApps = { screen = Screen.Apps },
                     onBluetooth = { viewModel.openBluetooth() },
                     onSettings = { viewModel.openSettings() },
@@ -82,6 +92,23 @@ fun OpentaimentApp(viewModel: HomeViewModel, isDefaultHome: () -> Boolean) {
                     screen = Screen.Home
                 },
                 onBack = { screen = Screen.Home },
+                modifier = content,
+            )
+            Screen.Stats -> StatsScreen(
+                connection = vehicleConnection,
+                stats = vehicleStats,
+                profile = vehicleProfile,
+                actions = StatsActions(
+                    onBack = { screen = Screen.Home },
+                    pairedDevices = viewModel::pairedObdDevices,
+                    hasBluetoothPermission = viewModel::hasBluetoothPermission,
+                    onConnect = viewModel::connectObd,
+                    onDemo = viewModel::startVehicleDemo,
+                    onDisconnect = viewModel::disconnectObd,
+                    onResetTrip = viewModel::resetTrip,
+                    onProfileChange = viewModel::updateVehicleProfile,
+                    onOpenBluetoothSettings = { viewModel.openBluetooth() },
+                ),
                 modifier = content,
             )
         }

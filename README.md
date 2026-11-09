@@ -11,10 +11,35 @@ Otwarty system infotainment do samochodu dla Androida i Android Auto.
 
 - Ekran główny: zegar, data, pogoda (Open-Meteo, bez klucza API, ostrzeżenie o śliskiej drodze)
 - Sterowanie muzyką z **dowolnej** aplikacji (Spotify, YouTube Music, Tidal, radio…): okładka, tytuł, postęp, play/pauza/następny/poprzedni
-- Skróty: nawigacja (Google Maps → Waze → OsmAnd), muzyka, telefon, Bluetooth, ustawienia
+- **Statystyki z OBD-II** (adapter ELM327 Bluetooth): spalanie chwilowe i średnie, moc i moment (szacowane), przyspieszenie, automatyczny pomiar 0–100 i 80–120 km/h z rekordami, temperatury, napięcie, poziom paliwa, licznik trasy, wykres ostatniej minuty. Jest **tryb demo** bez auta.
+- Skróty: nawigacja (Google Maps → Waze → OsmAnd), muzyka, statystyki, Bluetooth, ustawienia
 - Lista aplikacji z wyszukiwarką
 - Tryb launchera (można ustawić jako ekran główny), ekran nie gaśnie, ukryte paski systemowe
 - Układ poziomy i pionowy
+
+## Statystyki (OBD-II)
+
+![Statystyki](app-headunit/src/test/snapshots/images/app.opentaiment.headunit_StatsScreenScreenshotTest_statsDemoDriving.png)
+
+| | |
+|---|---|
+| ![Bez połączenia](app-headunit/src/test/snapshots/images/app.opentaiment.headunit_StatsScreenScreenshotTest_statsNotConnected.png) | ![Kafelek](app-headunit/src/test/snapshots/images/app.opentaiment.headunit_StatsScreenScreenshotTest_homeWithLiveObd.png) |
+| Instrukcja podłączenia adaptera | Podczas jazdy kafelek na ekranie głównym pokazuje prędkość i spalanie |
+
+**Co jest potrzebne:** adapter ELM327 na Bluetooth (tzw. „kostka OBD”, ~30–80 zł), wpięty w gniazdo OBD-II
+(każda benzyna od 2001 i diesel od 2004 w UE). Sparuj go w ustawieniach Bluetooth, potem *Statystyki → Połącz OBD*.
+Adapter jest zapamiętywany i przy następnym starcie aplikacja łączy się sama.
+
+**Skąd biorą się liczby:**
+
+| Wartość | Źródło |
+|---|---|
+| Spalanie | PID 5E (jeśli auto go ma) → przepływomierz MAF → ciśnienie w kolektorze MAP (z pojemności silnika). Wykrywa odcięcie paliwa przy hamowaniu silnikiem. |
+| Przyspieszenie | Regresja liniowa prędkości z ostatnich 1,5 s |
+| Moc, moment | Szacowane z fizyki: masa × przyspieszenie + opory toczenia + opór powietrza, ÷ sprawność układu napędowego. Najdokładniejsze przy pełnym gazie na płaskim. |
+| 0–100, 80–120 | Start/meta interpolowane między próbkami, przerywane gdy odpuścisz gaz |
+
+W *Statystyki → Auto* ustaw rodzaj paliwa, masę i pojemność silnika, bo bez tego moc i spalanie będą mniej dokładne.
 
 ## Screeny (v0.1)
 
@@ -47,6 +72,7 @@ core/ui/           motyw i wspólne komponenty
 feature/media/     sterowanie sesjami mediów
 feature/weather/   pogoda (Open-Meteo)
 feature/apps/      lista aplikacji i skróty
+feature/vehicle/   OBD-II (ELM327), obliczenia, symulator jazdy, ekran statystyk
 ```
 
 Testy: `./gradlew testDebugUnitTest` · zrzuty ekranu bez emulatora: `./gradlew :app-headunit:recordPaparazziDebug`

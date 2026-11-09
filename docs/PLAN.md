@@ -114,9 +114,10 @@ Sprzęt: najpierw **tablet z Androidem** (tryb Head Unit), potem **auto z Androi
 1. ✅ Szkielet projektu Gradle (`app-headunit`, `core/ui`, `feature/media|weather|apps`)
 2. ✅ Design system w `core/ui`
 3. ✅ Launcher na tablet: zegar, pogoda, sterowanie muzyką, skróty, lista aplikacji
-4. ⏭️ Ustawienia Opentaiment (adres domowy/praca, wybór domyślnej nawigacji i playera, motyw)
-5. ⏭️ Moduły `app-phone` + `car`: Android Auto (media → POI → dashboard), test na DHU
-6. ⏭️ OBD-II (ELM327)
+4. ✅ Statystyki z OBD-II (ELM327 Bluetooth): spalanie, moc, moment, przyspieszenie, sprinty, trasa, tryb demo
+5. ⏭️ Ustawienia Opentaiment (adres domowy/praca, wybór domyślnej nawigacji i playera, motyw)
+6. ⏭️ Moduły `app-phone` + `car`: Android Auto (media → POI → dashboard), test na DHU
+7. ⏭️ OBD dalej: adaptery BLE, kody błędów (DTC), historia tras, automatyczne ponowne łączenie
 
 Uwaga: obecnie DI jest ręczne (repozytoria tworzone w ViewModelu). Hilt wejdzie razem z `app-phone`,
 kiedy pojawi się drugi konsument tych samych repozytoriów.

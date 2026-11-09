@@ -45,6 +45,7 @@ dependencies {
     implementation(project(":feature:media"))
     implementation(project(":feature:weather"))
     implementation(project(":feature:apps"))
+    implementation(project(":feature:vehicle"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
