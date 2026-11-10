@@ -15,9 +15,12 @@ enum class ObdPid(val code: Int, private val bytes: Int, private val decode: (In
     MAF(0x10, 2, { (it[0] * 256 + it[1]) / 100.0 }),
     THROTTLE(0x11, 1, { it[0] * 100.0 / 255 }),
     FUEL_LEVEL(0x2F, 1, { it[0] * 100.0 / 255 }),
+    BARO(0x33, 1, { it[0].toDouble() }),
     AMBIENT_TEMP(0x46, 1, { it[0] - 40.0 }),
     OIL_TEMP(0x5C, 1, { it[0] - 40.0 }),
     FUEL_RATE(0x5E, 2, { (it[0] * 256 + it[1]) / 20.0 }),
+    /** Odometer, km (newer cars only). */
+    ODOMETER(0xA6, 4, { ((it[0].toLong() shl 24) + (it[1] shl 16) + (it[2] shl 8) + it[3]) / 10.0 }),
     ;
 
     val command: String get() = String.format(Locale.US, "01%02X", code)

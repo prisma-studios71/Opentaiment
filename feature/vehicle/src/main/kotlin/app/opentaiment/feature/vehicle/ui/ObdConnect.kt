@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Bluetooth
+import androidx.compose.material.icons.rounded.BluetoothSearching
 import androidx.compose.material.icons.rounded.DirectionsCar
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.AlertDialog
@@ -36,6 +37,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,6 +55,9 @@ class ObdConnectActions(
     val onConnect: (ObdDevice) -> Unit,
     val onDemo: () -> Unit,
     val onOpenBluetoothSettings: () -> Unit,
+    /** Looks for BLE adapters nearby (null = BLE not offered on this screen). */
+    val scanBle: (suspend () -> List<ObdDevice>)? = null,
+    val hasBleScanPermission: () -> Boolean = { true },
 )
 
 /**
@@ -61,12 +67,36 @@ class ObdConnectActions(
 @Composable
 fun rememberObdConnector(actions: ObdConnectActions): () -> Unit {
     var showDevices by remember { mutableStateOf(false) }
+    var scanning by remember { mutableStateOf(false) }
+    var bleDevices by remember { mutableStateOf<List<ObdDevice>>(emptyList()) }
+    val scope = rememberCoroutineScope()
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) showDevices = true
     }
+    val scan: () -> Unit = {
+        val scanBle = actions.scanBle
+        if (scanBle != null && !scanning) {
+            scanning = true
+            scope.launch {
+                bleDevices = scanBle()
+                scanning = false
+            }
+        }
+    }
+    val scanPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
+        if (result.values.all { it }) scan()
+    }
     if (showDevices) {
+        val paired = remember { actions.pairedDevices() }
         DevicePickerDialog(
-            devices = remember { actions.pairedDevices() },
+            devices = (paired + bleDevices.filter { b -> paired.none { it.address == b.address } }),
+            scanning = scanning,
+            onScanBle = actions.scanBle?.let {
+                {
+                    if (actions.hasBleScanPermission()) scan()
+                    else scanPermission.launch(blePermissions())
+                }
+            },
             onPick = {
                 showDevices = false
                 actions.onConnect(it)
@@ -134,7 +164,8 @@ internal fun ConnectPrompt(
                     if (connection is ConnectionState.Failed) {
                         Spacer(Modifier.height(16.dp))
                         Text(
-                            "⚠️ ${connection.message}",
+                            if (connection.reconnecting) "⚠️ ${connection.message}\nPołączę się ponownie sam, gdy adapter odpowie."
+                            else "⚠️ ${connection.message}",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.error,
                             textAlign = TextAlign.Center,
@@ -162,25 +193,48 @@ internal fun ConnectPrompt(
     }
 }
 
+/** Permissions needed to look for BLE devices. */
+fun blePermissions(): Array<String> =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT)
+    else arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
+
 @Composable
 internal fun DevicePickerDialog(
     devices: List<ObdDevice>,
     onPick: (ObdDevice) -> Unit,
     onOpenSettings: () -> Unit,
     onDismiss: () -> Unit,
+    scanning: Boolean = false,
+    onScanBle: (() -> Unit)? = null,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Wybierz adapter OBD") },
         text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                if (onScanBle != null) {
+                    OutlinedButton(onClick = onScanBle, enabled = !scanning, modifier = Modifier.fillMaxWidth().height(56.dp)) {
+                        if (scanning) {
+                            CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                            Spacer(Modifier.width(12.dp))
+                            Text("Szukam adapterów BLE…")
+                        } else {
+                            Icon(Icons.Rounded.BluetoothSearching, contentDescription = null)
+                            Spacer(Modifier.width(12.dp))
+                            Text("Szukaj adapterów BLE (bez parowania)")
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
             if (devices.isEmpty()) {
                 Text(
                     "Brak sparowanych urządzeń Bluetooth. Sparuj adapter OBD w ustawieniach " +
-                        "(PIN zwykle 1234 albo 0000) i wróć tutaj.",
+                        "(PIN zwykle 1234 albo 0000) i wróć tutaj. Adaptery BLE (np. Vgate iCar Pro BLE, " +
+                        "OBDLink CX) znajdziesz przyciskiem wyżej.",
                     style = MaterialTheme.typography.bodyLarge,
                 )
             } else {
-                Column(Modifier.verticalScroll(rememberScrollState())) {
+                Column {
                     devices.forEach { device ->
                         Row(
                             Modifier.fillMaxWidth()
@@ -198,13 +252,15 @@ internal fun DevicePickerDialog(
                             Column {
                                 Text(device.name, style = MaterialTheme.typography.titleMedium)
                                 Text(
-                                    device.address, style = MaterialTheme.typography.labelLarge,
+                                    if (device.ble) "${device.address} · BLE" else device.address,
+                                    style = MaterialTheme.typography.labelLarge,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
                         }
                     }
                 }
+            }
             }
         },
         confirmButton = { TextButton(onClick = onOpenSettings) { Text("Ustawienia Bluetooth") } },

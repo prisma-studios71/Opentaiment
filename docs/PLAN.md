@@ -34,8 +34,22 @@ szablonów Google (Car App Library). Opentaiment tak właśnie działa:
 Kategoria aplikacji w Android Auto: **IoT** (szablony list, siatki i paneli). Aplikacja spoza
 Sklepu Play wymaga włączenia „Nieznanych źródeł” w ustawieniach programisty Android Auto.
 
-**Tablet / radio z Androidem** – tryb dodatkowy: ten sam kod jako pełnoekranowy launcher
-(zegar, pogoda, sterowanie muzyką, kafelki) dla aut bez Android Auto.
+**Radio z Androidem / tablet** – ten sam kod jako pełnoprawne radio samochodowe dla aut bez
+Android Auto: launcher, radio internetowe i pliki, usługa w tle reagująca na zapłon, przyciski na
+kierownicy, głośność zależna od prędkości, jasność dzień/noc, dymek nad nawigacją.
+
+```
+ Radio / tablet (app-headunit)
+┌────────────────────────────────────────────────────────────┐
+│ MainActivity (launcher, HOME)   KeyListenerService (opcja) │
+│        │                                │ klawisze         │
+│ HeadunitService (zawsze w tle) ◄────────┘                  │
+│  • zapłon: BOOT / zasilanie USB / ekran → OBD, radio       │
+│  • głośność od prędkości, jasność, dymek, ślad GPS          │
+│        │               │                 │                  │
+│  VehicleHub (OBD)   PlayerHub (Media3)   TpmsHub (BLE)      │
+└────────────────────────────────────────────────────────────┘
+```
 
 ## 3. Stack technologiczny
 
@@ -53,7 +67,8 @@ car/                ekrany Android Auto (CarAppService + szablony)
 app-headunit/       launcher na tablet / radio z Androidem (tryb dodatkowy)
 core/ui/            motywy, tryb nocny (wschód/zachód słońca), wspólne komponenty
 feature/vehicle/    OBD-II, obliczenia, historia tras, alerty, wyścig, ekrany Compose
-feature/media/      sterowanie muzyką (tablet)
+feature/player/     radio internetowe (radio-browser.info) i pliki z USB/karty, Media3
+feature/media/      sterowanie muzyką innych aplikacji (tablet)
 feature/weather/    pogoda (tablet)
 feature/apps/       lista aplikacji (tablet)
 ```
@@ -79,14 +94,29 @@ feature/apps/       lista aplikacji (tablet)
 - ✅ Ekran „Jazda” – jedna wielka liczba, strony przesuwane palcem
 - ✅ Gesty: przesuwanie stron jazdy, przesunięcie karty muzyki zmienia utwór (tablet), przytrzymanie kafelka = edycja
 
+**Radio z Androidem**
+- ✅ Radio internetowe: katalog, wyszukiwarka, ulubione, własne adresy, metadane ICY, ponawianie po utracie sieci
+- ✅ Odtwarzacz plików z pamięci / karty / USB (foldery, losowo)
+- ✅ Usługa w tle: start z systemem, zapłon (zasilanie USB), zapis trasy przy wyłączeniu i co 20 s
+- ✅ Przyciski na kierownicy z uczeniem, także nad innymi aplikacjami (usługa dostępności)
+- ✅ Głośność zależna od prędkości (OBD albo GPS), jasność systemu dzień/noc, dymek nad nawigacją
+- ✅ Widżety: radio, nawigacja (dom/praca/stacje), opony, serwis
+
+**OBD i auto – nowe**
+- ✅ Adaptery OBD na BLE, automatyczne ponowne łączenie (trasa się nie urywa)
+- ✅ Zegary (obroty, prędkość, doładowanie, temperatury, napięcie)
+- ✅ Czujniki ciśnienia w oponach (BLE TPMS)
+- ✅ Przypomnienia serwisowe po km i datach, przebieg z PID A6 albo z tras
+- ✅ Ślad GPS trasy z mapką, eksport GPX i CSV
+
 **Aplikacje**
 - ✅ Telefon + Android Auto
-- ✅ Tablet: launcher z edytowalnymi kafelkami, pogodą i sterowaniem muzyką
+- ✅ Radio / tablet: launcher z edytowalnymi kafelkami i widżetami
 
 ## 6. Dalej
 
-- Adaptery OBD na BLE (np. Vgate iCar Pro BLE, OBDLink CX)
-- Automatyczne ponowne łączenie po zerwaniu połączenia
-- Eksport tras do CSV
+- Kamera cofania i rejestrator jazdy (USB/UVC)
+- Integracja z CAN-busem (canbox Raise/Hiworld): drzwi, klima, czujniki parkowania
+- Zakładki radia na telefonie i w Android Auto
 - Wersja w Sklepie Play (wymaga przeglądu jakości Android Auto i podpisu release)
 - Licencja – do decyzji (GPL-3.0 albo Apache-2.0)

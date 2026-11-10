@@ -78,7 +78,10 @@ fun HomeScreen(
                     slot(1, Modifier.weight(1.2f).fillMaxWidth())
                 }
                 slot(2, Modifier.weight(1.5f).fillMaxHeight())
-                TileGrid(tiles, columns = 2, onEdit = actions.onEditTiles, modifier = Modifier.weight(1f).fillMaxHeight())
+                TileGrid(
+                    tiles, columns = if (tiles.size > 8) 3 else 2, onEdit = actions.onEditTiles,
+                    modifier = Modifier.weight(if (tiles.size > 8) 1.4f else 1f).fillMaxHeight(),
+                )
             }
         } else {
             Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(gap)) {

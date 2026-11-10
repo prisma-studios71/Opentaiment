@@ -102,6 +102,9 @@ class TripCalculator(var profile: VehicleProfile = VehicleProfile()) {
             ambientTempC = merged.ambientTempC,
             fuelLevelPct = merged.fuelLevelPct,
             voltage = merged.voltage,
+            intakeMapKpa = merged.mapKpa,
+            boostKpa = merged.mapKpa?.let { it - (merged.baroKpa ?: STANDARD_BARO_KPA) },
+            odometerKm = merged.odometerKm,
             fuelRateLh = fuel?.first,
             fuelSource = fuel?.second ?: FuelSource.NONE,
             instantLPer100Km = instant,
@@ -207,6 +210,7 @@ class TripCalculator(var profile: VehicleProfile = VehicleProfile()) {
 
     companion object {
         const val GRAVITY = 9.81
+        const val STANDARD_BARO_KPA = 101.3
         const val AIR_DENSITY = 1.2
         const val GAS_CONSTANT = 8.314
         const val AIR_MOLAR_MASS_KG = 0.02897

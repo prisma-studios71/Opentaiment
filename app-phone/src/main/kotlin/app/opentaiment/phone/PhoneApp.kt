@@ -51,6 +51,7 @@ import app.opentaiment.feature.vehicle.ConnectionState
 import app.opentaiment.feature.vehicle.DiagnosticsState
 import app.opentaiment.feature.vehicle.VehicleHub
 import app.opentaiment.feature.vehicle.data.TripRecord
+import app.opentaiment.feature.vehicle.data.TripSharing
 import app.opentaiment.feature.vehicle.data.VehicleProfile
 import app.opentaiment.feature.vehicle.data.VehicleStats
 import app.opentaiment.feature.vehicle.race.RaceState
@@ -98,6 +99,7 @@ class PhoneActions(
     val onSearchCode: (String) -> Unit,
     val onDeleteTrip: (Long) -> Unit,
     val onClearTrips: () -> Unit,
+    val onExportTrips: (() -> Unit)? = null,
     val race: (onBack: () -> Unit) -> RaceActions,
     val onAppearanceChange: (AppearanceSettings) -> Unit,
 )
@@ -124,7 +126,10 @@ fun PhoneApp(appearance: AppearanceController) {
                 onOpenBluetoothSettings = {
                     context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                 },
+                scanBle = vehicle::scanBleAdapters,
+                hasBleScanPermission = vehicle::hasBleScanPermission,
             ),
+            onExportTrips = { TripSharing.shareCsv(context, vehicle.trips.value) },
             onDisconnect = vehicle::disconnect,
             onResetTrip = vehicle::resetTrip,
             onProfileChange = vehicle::updateProfile,
@@ -200,7 +205,7 @@ fun PhoneContent(
                 DiagnosticsActions(null, actions.connect, actions.onReadDtcs, actions.onClearDtcs, actions.onSearchCode),
                 content,
             )
-            Tab.TRIPS -> TripsScreen(state.trips, TripsActions(null, actions.onDeleteTrip, actions.onClearTrips), content)
+            Tab.TRIPS -> TripsScreen(state.trips, TripsActions(null, actions.onDeleteTrip, actions.onClearTrips, onExportCsv = actions.onExportTrips), content)
             Tab.MORE -> when (more) {
                 MorePage.MENU -> MoreMenu(onRace = { more = MorePage.RACE }, onSettings = { more = MorePage.SETTINGS }, modifier = content)
                 MorePage.RACE -> RaceScreen(state.race, state.stats, actions.race { more = MorePage.MENU }, content)

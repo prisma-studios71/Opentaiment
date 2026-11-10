@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">Opentaiment</string>
+    <string name="key_service_label">Opentaiment – przyciski na kierownicy</string>
+    <string name="key_service_description">Pozwala przyciskom na kierownicy działać także wtedy, gdy na ekranie jest nawigacja albo inna aplikacja. Opentaiment reaguje tylko na przyciski, które przypiszesz w ustawieniach, i nie czyta zawartości ekranu.</string>
 </resources>

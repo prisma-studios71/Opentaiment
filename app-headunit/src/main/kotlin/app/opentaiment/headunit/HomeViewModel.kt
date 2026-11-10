@@ -23,6 +23,30 @@ import app.opentaiment.headunit.tiles.HomeWidget
 import app.opentaiment.headunit.tiles.TilesStore
 import app.opentaiment.headunit.tiles.WidgetsStore
 import app.opentaiment.feature.weather.WeatherState
+import android.content.Intent
+import android.provider.Settings
+import app.opentaiment.feature.player.LocalTrack
+import app.opentaiment.feature.player.PlayerHub
+import app.opentaiment.feature.player.PlayerState
+import app.opentaiment.feature.player.RadioStation
+import app.opentaiment.feature.player.StationsState
+import app.opentaiment.feature.vehicle.data.ReminderStatus
+import app.opentaiment.feature.vehicle.data.ServiceReminder
+import app.opentaiment.feature.vehicle.data.TrackPoint
+import app.opentaiment.feature.vehicle.data.TripSharing
+import app.opentaiment.feature.vehicle.tpms.TpmsHub
+import app.opentaiment.feature.vehicle.tpms.TpmsLimits
+import app.opentaiment.feature.vehicle.tpms.TpmsState
+import app.opentaiment.feature.vehicle.tpms.Wheel
+import app.opentaiment.headunit.car.Brightness
+import app.opentaiment.headunit.car.CarPermissions
+import app.opentaiment.headunit.car.CarSettings
+import app.opentaiment.headunit.car.CarSettingsStore
+import app.opentaiment.headunit.car.KeyListenerService
+import app.opentaiment.headunit.car.OverlayBubble
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -45,6 +69,9 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private val appearanceController = AppearanceController(app, viewModelScope)
     private val tilesStore = TilesStore(app)
     private val widgetsStore = WidgetsStore(app)
+    private val player = PlayerHub.get(app)
+    private val tpmsRepo = TpmsHub.get(app)
+    private val carSettingsStore = CarSettingsStore.get(app)
 
     val now: StateFlow<LocalDateTime> = flow {
         while (true) {
@@ -70,6 +97,30 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     val race: StateFlow<RaceState> = vehicle.race
     val appearance: StateFlow<AppearanceState> = appearanceController.state
 
+    val playerState: StateFlow<PlayerState> = player.state
+    val favorites: StateFlow<List<RadioStation>> = player.favorites
+    val popularStations: StateFlow<StationsState> = player.popular
+    val stationSearch: StateFlow<StationsState?> = player.searchResults
+    val localTracks: StateFlow<List<LocalTrack>?> = player.tracks
+    val tpms: StateFlow<TpmsState> = tpmsRepo.state
+    val reminders: StateFlow<List<ReminderStatus>> = vehicle.reminderStatuses
+    val odometerKm: StateFlow<Double?> = vehicle.odometerKm
+    val carSettings: StateFlow<CarSettings> = carSettingsStore.settings
+
+    private val _permissions = MutableStateFlow(CarPermissions())
+    /** Special permissions (brightness, overlay, steering keys everywhere) – re-checked on resume. */
+    val carPermissions: StateFlow<CarPermissions> = _permissions.asStateFlow()
+
+    private val _tpmsEnabled = MutableStateFlow(tpmsRepo.enabled)
+    val tpmsEnabled: StateFlow<Boolean> = _tpmsEnabled.asStateFlow()
+
+    private val _autoReconnect = MutableStateFlow(vehicle.autoReconnectEnabled)
+    val autoReconnect: StateFlow<Boolean> = _autoReconnect.asStateFlow()
+
+    private val _requestedScreen = MutableStateFlow<String?>(null)
+    /** A screen asked for from outside (steering wheel button, notification). */
+    val requestedScreen: StateFlow<String?> = _requestedScreen.asStateFlow()
+
     /** Ids of tiles on the home screen, in display order. */
     val tiles: StateFlow<List<String>> = tilesStore.tiles
 
@@ -93,6 +144,80 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         media.start()
         appearanceController.refresh()
         reloadApps() // apps may have been installed/removed meanwhile
+        player.connect()
+        refreshPermissions()
+    }
+
+    fun refreshPermissions() {
+        val app = getApplication<Application>()
+        _permissions.value = CarPermissions(
+            brightness = Brightness.canWrite(app),
+            overlay = OverlayBubble.canDraw(app),
+            keysEverywhere = KeyListenerService.isEnabled(app),
+            preciseLocation = ContextCompat.checkSelfPermission(app, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED,
+        )
+    }
+
+    fun requestScreen(screen: String?) { _requestedScreen.value = screen }
+    fun consumeRequestedScreen() { _requestedScreen.value = null }
+
+    // --- radio & music ---
+    fun playStation(station: RadioStation, list: List<RadioStation>) = player.playStation(station, list)
+    fun toggleFavorite(station: RadioStation) = player.toggleFavorite(station)
+    fun addCustomStation(name: String, url: String) = player.addCustomStation(name, url)
+    fun searchStations(query: String) = player.search(query)
+    fun loadPopularStations() = player.loadPopular()
+    fun playTracks(tracks: List<LocalTrack>, index: Int, shuffle: Boolean) = player.playTracks(tracks, index, shuffle)
+    fun loadTracks() = player.loadTracks()
+    fun storagePermission() = player.storagePermission()
+    fun hasStoragePermission() = player.hasStoragePermission()
+    fun radioToggle() = player.togglePlay()
+    fun radioNext() = player.next()
+    fun radioPrevious() = player.previous()
+
+    // --- tyres ---
+    fun hasTpmsPermission() = tpmsRepo.hasPermission()
+    fun setTpmsEnabled(on: Boolean) {
+        tpmsRepo.setEnabled(on)
+        _tpmsEnabled.value = on
+    }
+    fun assignTpms(sensorId: String, wheel: Wheel) = tpmsRepo.assign(sensorId, wheel)
+    fun forgetTpms(wheel: Wheel) = tpmsRepo.forgetWheel(wheel)
+    fun setTpmsLimits(limits: TpmsLimits) = tpmsRepo.setLimits(limits)
+
+    // --- service reminders ---
+    fun setOdometer(km: Double) = vehicle.setOdometer(km)
+    fun markReminderDone(id: String) = vehicle.markReminderDone(id)
+    fun saveReminder(reminder: ServiceReminder) = vehicle.updateReminder(reminder)
+    fun deleteReminder(id: String) = vehicle.deleteReminder(id)
+
+    // --- trips export ---
+    fun exportTripsCsv() { TripSharing.shareCsv(getApplication(), trips.value) }
+    fun trackOf(id: Long): List<TrackPoint> = vehicle.trackOf(id)
+    fun shareGpx(trip: TripRecord) { TripSharing.shareGpx(getApplication(), trip, vehicle.trackOf(trip.id)) }
+
+    // --- car radio settings ---
+    fun updateCarSettings(transform: (CarSettings) -> CarSettings) = carSettingsStore.update(transform)
+    fun setAutoReconnect(on: Boolean) {
+        vehicle.autoReconnectEnabled = on
+        _autoReconnect.value = on
+    }
+    fun openBrightnessPermission() = startIntent(Brightness.permissionIntent(getApplication()))
+    fun openOverlayPermission() = startIntent(OverlayBubble.permissionIntent(getApplication()))
+    fun openAccessibilitySettings() = startIntent(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    fun navigateHome() = carSettings.value.homeAddress.let { if (it.isBlank()) appsRepo.openNavigation() else appsRepo.navigateTo(it) }
+    fun navigateWork() = carSettings.value.workAddress.let { if (it.isBlank()) appsRepo.openNavigation() else appsRepo.navigateTo(it) }
+    fun searchNearby(what: String) = appsRepo.searchNearby(what)
+
+    // --- OBD over BLE ---
+    suspend fun scanBleAdapters() = vehicle.scanBleAdapters()
+    fun hasBleScanPermission() = vehicle.hasBleScanPermission()
+
+    private fun startIntent(intent: Intent) {
+        try {
+            getApplication<Application>().startActivity(intent)
+        } catch (_: Exception) {
+        }
     }
 
     fun hasLocationPermission(): Boolean = weatherRepo.hasLocationPermission()

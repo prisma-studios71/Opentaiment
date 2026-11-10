@@ -31,7 +31,7 @@ class Elm327(private val transport: ObdTransport) {
     suspend fun supportedPids(): Set<Int> {
         val result = mutableSetOf<Int>()
         var base = 0x00
-        while (base <= 0x40) {
+        while (base <= 0xC0) {
             val cmd = String.format(Locale.US, "01%02X", base)
             val data = Elm327Parser.mode01Data(transport.send(cmd, 5_000), base) ?: break
             if (data.size < 4) break
