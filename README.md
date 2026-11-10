@@ -135,7 +135,9 @@ głośność zależna od prędkości. APK: artefakt `opentaiment-tablet-debug`.
 
 ### Jak ustawić radio
 
-1. Zainstaluj APK i ustaw Opentaiment jako ekran główny (Android zapyta po wciśnięciu „Home”).
+1. Zainstaluj APK. Przy pierwszym starcie Opentaiment zaproponuje, że zostanie **ekranem głównym**
+   (launcherem) – kliknij „Ustaw”. Później: **Ustawienia → Tablet → Ustaw jako ekran główny**.
+   W części chińskich radyj launcher wybiera się w ustawieniach fabrycznych („Default launcher”).
 2. **Ustawienia → Radio samochodowe**: włącz to, czego chcesz. Przy jasności, dymku i przyciskach
    Android poprosi o osobne zgody („Modyfikowanie ustawień systemu”, „Wyświetlanie nad innymi aplikacjami”,
    usługa dostępności „Opentaiment – przyciski na kierownicy”).
