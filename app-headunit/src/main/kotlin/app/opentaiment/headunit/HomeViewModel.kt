@@ -39,6 +39,7 @@ import app.opentaiment.feature.vehicle.tpms.TpmsLimits
 import app.opentaiment.feature.vehicle.tpms.TpmsState
 import app.opentaiment.feature.vehicle.tpms.Wheel
 import app.opentaiment.headunit.car.Brightness
+import app.opentaiment.headunit.car.DefaultHome
 import app.opentaiment.headunit.car.CarPermissions
 import app.opentaiment.headunit.car.CarSettings
 import app.opentaiment.headunit.car.CarSettingsStore
@@ -117,6 +118,26 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private val _autoReconnect = MutableStateFlow(vehicle.autoReconnectEnabled)
     val autoReconnect: StateFlow<Boolean> = _autoReconnect.asStateFlow()
 
+    private val homePrefs = app.getSharedPreferences("home", android.content.Context.MODE_PRIVATE)
+
+    private val _isDefaultHome = MutableStateFlow(DefaultHome.isDefault(app))
+    /** Whether Opentaiment is the device's home screen (launcher). Re-checked on resume. */
+    val isDefaultHome: StateFlow<Boolean> = _isDefaultHome.asStateFlow()
+
+    private val _offerDefaultHome = MutableStateFlow(!_isDefaultHome.value && !homePrefs.getBoolean(KEY_HOME_ASKED, false))
+    /** Ask once, on first start, whether to become the home screen. */
+    val offerDefaultHome: StateFlow<Boolean> = _offerDefaultHome.asStateFlow()
+
+    fun refreshDefaultHome() {
+        _isDefaultHome.value = DefaultHome.isDefault(getApplication())
+        if (_isDefaultHome.value) _offerDefaultHome.value = false
+    }
+
+    fun dismissDefaultHomeOffer() {
+        homePrefs.edit().putBoolean(KEY_HOME_ASKED, true).apply()
+        _offerDefaultHome.value = false
+    }
+
     private val _requestedScreen = MutableStateFlow<String?>(null)
     /** A screen asked for from outside (steering wheel button, notification). */
     val requestedScreen: StateFlow<String?> = _requestedScreen.asStateFlow()
@@ -146,6 +167,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         reloadApps() // apps may have been installed/removed meanwhile
         player.connect()
         refreshPermissions()
+        refreshDefaultHome()
     }
 
     fun refreshPermissions() {
@@ -289,5 +311,9 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     override fun onCleared() {
         media.stop()
         // The OBD connection lives in VehicleHub and outlives this screen on purpose.
+    }
+
+    private companion object {
+        const val KEY_HOME_ASKED = "default_home_asked"
     }
 }

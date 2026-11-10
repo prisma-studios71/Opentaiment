@@ -1,7 +1,6 @@
 package app.opentaiment.headunit
 
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
@@ -48,7 +47,7 @@ class MainActivity : ComponentActivity() {
                 applyNightBrightness(window, if (car.brightnessControl) look.copy(isNight = false) else look)
             }
             OpentaimentTheme(accent = look.settings.accent, night = look.isNight) {
-                OpentaimentApp(viewModel = viewModel, isDefaultHome = ::isDefaultHome)
+                OpentaimentApp(viewModel = viewModel)
             }
         }
     }
@@ -104,11 +103,5 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_SCREEN = "screen"
         const val SCREEN_PLAYER = "player"
         const val SCREEN_DRIVE = "drive"
-    }
-
-    private fun isDefaultHome(): Boolean {
-        val home = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
-        return packageManager.resolveActivity(home, PackageManager.MATCH_DEFAULT_ONLY)
-            ?.activityInfo?.packageName == packageName
     }
 }

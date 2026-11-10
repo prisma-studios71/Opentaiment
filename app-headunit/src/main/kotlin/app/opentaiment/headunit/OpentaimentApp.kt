@@ -18,6 +18,11 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.platform.LocalContext
+import app.opentaiment.headunit.car.DefaultHome
 import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
 import app.opentaiment.core.ui.OtCard
@@ -84,7 +89,7 @@ import app.opentaiment.headunit.car.CarSettingsSection
 private enum class Screen { Home, Apps, Drive, Stats, Diagnostics, Trips, Race, Settings, EditTiles, EditWidgets, Player, Gauges, Tpms, Service }
 
 @Composable
-fun OpentaimentApp(viewModel: HomeViewModel, isDefaultHome: () -> Boolean) {
+fun OpentaimentApp(viewModel: HomeViewModel) {
     var screen by rememberSaveable { mutableStateOf(Screen.Home) }
     var editedSlot by rememberSaveable { mutableIntStateOf(0) }
 
@@ -100,7 +105,43 @@ fun OpentaimentApp(viewModel: HomeViewModel, isDefaultHome: () -> Boolean) {
 
     // Back from any sub-screen returns home; on home a launcher swallows Back.
     BackHandler(enabled = screen != Screen.Home) { screen = Screen.Home }
-    BackHandler(enabled = screen == Screen.Home && isDefaultHome()) { }
+    val isDefaultHome by viewModel.isDefaultHome.collectAsStateWithLifecycle()
+    val offerDefaultHome by viewModel.offerDefaultHome.collectAsStateWithLifecycle()
+    BackHandler(enabled = screen == Screen.Home && isDefaultHome) { }
+
+    val context = LocalContext.current
+    val homeSettings = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        viewModel.refreshDefaultHome()
+    }
+    val homeRole = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        viewModel.refreshDefaultHome()
+        // Some ROMs refuse the dialog (or the user said no before): offer the settings page instead.
+        if (!viewModel.isDefaultHome.value) homeSettings.launch(DefaultHome.settingsIntent(context))
+    }
+    val makeDefaultHome: () -> Unit = {
+        viewModel.dismissDefaultHomeOffer()
+        val role = DefaultHome.roleRequestIntent(context)
+        try {
+            if (role != null) homeRole.launch(role) else homeSettings.launch(DefaultHome.settingsIntent(context))
+        } catch (e: android.content.ActivityNotFoundException) {
+            viewModel.openSettings()
+        }
+    }
+    if (offerDefaultHome && screen == Screen.Home) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissDefaultHomeOffer,
+            title = { Text("Ustawić Opentaiment jako ekran główny?") },
+            text = {
+                Text(
+                    "Wtedy po włączeniu radia i po wciśnięciu „Home” zawsze wita Cię Opentaiment, jak fabryczne radio. " +
+                        "Zawsze możesz to zmienić w ustawieniach.",
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+            },
+            confirmButton = { TextButton(onClick = makeDefaultHome) { Text("Ustaw") } },
+            dismissButton = { TextButton(onClick = viewModel::dismissDefaultHomeOffer) { Text("Nie teraz") } },
+        )
+    }
 
     val now by viewModel.now.collectAsStateWithLifecycle()
     val weather by viewModel.weather.collectAsStateWithLifecycle()
@@ -281,6 +322,19 @@ fun OpentaimentApp(viewModel: HomeViewModel, isDefaultHome: () -> Boolean) {
                 )
                 OtCard(Modifier.fillMaxWidth()) {
                     Text("Tablet", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.height(12.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            if (isDefaultHome) "Opentaiment jest ekranem głównym ✓"
+                            else "Opentaiment nie jest ekranem głównym – po starcie radia pokaże się inny launcher.",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = if (isDefaultHome) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        if (isDefaultHome) OutlinedButton(onClick = { homeSettings.launch(DefaultHome.settingsIntent(context)) }) { Text("Zmień") }
+                        else Button(onClick = makeDefaultHome) { Text("Ustaw jako ekran główny") }
+                    }
                     Spacer(Modifier.height(12.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         OutlinedButton(onClick = { screen = Screen.EditWidgets }) { Text("Edytuj widżety") }
