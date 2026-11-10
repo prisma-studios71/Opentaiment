@@ -4,7 +4,7 @@
 
 <br>
 
-[![Build](https://github.com/prisma-studios71/Opentaiment/actions/workflows/build.yml/badge.svg)](https://github.com/prisma-studios71/Opentaiment/actions/workflows/build.yml)
+[![Release](https://img.shields.io/github/v/release/prisma-studios71/Opentaiment?label=wersja&color=4FC3F7)](https://github.com/prisma-studios71/Opentaiment/releases/latest)
 ![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.0-7F52FF?logo=kotlin&logoColor=white)
 ![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4?logo=jetpackcompose&logoColor=white)
@@ -17,7 +17,7 @@
 ![Bez śledzenia](https://img.shields.io/badge/%C5%9Bledzenie-brak-66BB6A?style=flat-square)
 ![Język](https://img.shields.io/badge/j%C4%99zyk-polski%20%F0%9F%87%B5%F0%9F%87%B1-DC143C?style=flat-square)
 
-[![Pobierz APK](https://img.shields.io/badge/%E2%AC%87%EF%B8%8F%20Pobierz%20APK-GitHub%20Actions-4FC3F7?style=for-the-badge)](https://github.com/prisma-studios71/Opentaiment/actions/workflows/build.yml)
+[![Pobierz APK](https://img.shields.io/badge/%E2%AC%87%EF%B8%8F%20Pobierz%20APK-Releases-4FC3F7?style=for-the-badge)](https://github.com/prisma-studios71/Opentaiment/releases/latest)
 
 **[Funkcje](#-funkcje)** · **[Android Auto](#-jak-to-działa-z-android-auto)** · **[Radio z Androidem](#-radio-z-androidem-albo-tablet-w-desce)** · **[Instalacja](#-instalacja-telefon)** · **[Dla programistów](#-dla-programistów)**
 
@@ -174,7 +174,7 @@ i powiadomienie na telefonie.
 
 ## 📲 Instalacja (telefon)
 
-1. Pobierz APK: **[Actions](https://github.com/prisma-studios71/Opentaiment/actions/workflows/build.yml) → ostatni build → artefakt `opentaiment-phone-debug`**
+1. Pobierz APK z **[Releases](https://github.com/prisma-studios71/Opentaiment/releases/latest)** – plik `opentaiment-telefon-….apk`
    albo zbuduj: `./gradlew :app-phone:assembleDebug`
 2. Zainstaluj, wejdź w **Statystyki → Połącz OBD** i wybierz adapter
    (klasyczny Bluetooth najpierw sparuj w ustawieniach, PIN zwykle 1234 lub 0000; BLE znajdziesz przyciskiem „Szukaj”).
@@ -192,7 +192,7 @@ i powiadomienie na telefonie.
 ## 📻 Radio z Androidem (albo tablet w desce)
 
 Dla aut bez Android Auto ten sam kod działa jako **pełnoprawne radio samochodowe** (`app-headunit`).
-APK: artefakt `opentaiment-tablet-debug`.
+APK: **[Releases](https://github.com/prisma-studios71/Opentaiment/releases/latest)** – plik `opentaiment-radio-tablet-….apk`.
 
 <img src="app-headunit/src/test/snapshots/images/app.opentaiment.headunit_CarRadioScreenshotTest_homeCarRadio.png" width="100%" alt="Ekran główny radia">
 
