@@ -28,6 +28,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.opentaiment.core.ui.OtTheme
+import app.opentaiment.core.ui.UiStyle
 import app.opentaiment.feature.vehicle.ConnectionState
 import app.opentaiment.feature.vehicle.data.VehicleStats
 
@@ -50,11 +52,12 @@ fun DriveScreen(
         return
     }
     val pager = rememberPagerState(initialPage = initialPage) { PAGES }
+    val style = OtTheme.style.style
     Column(modifier) {
         AlertBanner(stats.alerts, Modifier.padding(bottom = 12.dp))
         HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth()) { page ->
             when (page) {
-                0 -> BigPage(
+                0 -> if (style != UiStyle.CLASSIC) StyledSpeedPage(style, stats) else BigPage(
                     value = stats.speedKmh.fmt(), unit = "km/h",
                     left = stats.instantLPer100Km?.let { Side("Spalanie teraz", it.fmt(1), "l/100 km") }
                         ?: Side("Spalanie teraz", stats.fuelRateLh.fmt(1), "l/h"),

@@ -146,16 +146,20 @@ serwis, głośność zależna od prędkości i reakcja na zapłon.
 
 ## 🎨 Style interfejsu
 
-W **Ustawienia → Wygląd** wybierasz styl całej apki. Każdy zmienia kolory, fonty, kształt kart i to, jak rysowane są wielkie liczby.
-Kolor akcentu działa we wszystkich stylach, a w Retro VFD to po prostu kolor świecenia wyświetlacza. Tryb nocny jest w każdym stylu ten sam, czerwono-czarny.
+W **Ustawienia → Wygląd** wybierasz styl całej apki. Styl to nie tylko kolory: **ekran główny radia, ekran „Jazda” na telefonie
+i dolny pasek mają w każdym stylu inny układ**. Reszta ekranów (statystyki, błędy, trasy…) zmienia fonty, karty i liczby.
+Kolor akcentu działa we wszystkich stylach, a w Retro VFD to kolor świecenia wyświetlacza. Tryb nocny jest wszędzie ten sam, czerwono-czarny.
 
-| Styl | Jak wygląda |
-|---|---|
-| **Klasyczny** | Spokojny Material, jak do tej pory |
-| **Cockpit** | Cyfry w monospace ze świecącą poświatą, cienkie ramki, światło za zegarami |
-| **Glass** | Półprzezroczyste karty na tle, które powoli przelewa się kolorami akcentu |
-| **Big type** | Ogromne liczby, ostre krawędzie, ramki jak na plakacie. Najczytelniejszy w trakcie jazdy |
-| **Retro VFD** | Siedmiosegmentowe cyfry z „duchami” zgaszonych segmentów i linie jak w kaseciaku z 2003 |
+| Styl | Ekran główny radia | Jazda na telefonie |
+|---|---|---|
+| **Klasyczny** | Trzy widżety do wyboru i siatka kafelków | Jedna wielka liczba |
+| **Cockpit** | Wielki zegar z łukiem w kolorze eco-score, obok „teraz gra” i opony na sylwetce auta, na dole dock | Zegar z prędkością w środku, spalanie, pasek obrotów |
+| **Glass** | Duży odtwarzacz z okładką i ulubionymi stacjami, obok szklane karty: prędkość, dom, pogoda, opony | Cienka liczba na poświacie, która z zielonej robi się czerwona, gdy jedziesz ostro |
+| **Big type** | Bloki: żółta prędkość z miernikiem eco, spalanie, opony, radio z przyciskami tekstowymi | Żółta płyta z prędkością i dwa bloki spalania |
+| **Retro VFD** | Pasek stacji z zegarem segmentowym, prędkość na 7 segmentach, analizator widma, fizyczne przyciski z diodami | Jeden panel VFD: prędkość, obroty, spalanie na bursztynowo, eco w kratkach |
+
+W stylach innych niż Klasyczny kafelki ekranu głównego stają się dockiem albo przyciskami (przytrzymaj, żeby je edytować),
+a widżety do wyboru są tylko w stylu Klasycznym.
 
 <div align="center">
 <img src="app-phone/src/test/snapshots/images/app.opentaiment.phone_PhoneScreenshotTest_driveCockpit.png" width="19%" alt="Cockpit">&nbsp;

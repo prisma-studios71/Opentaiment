@@ -220,6 +220,32 @@ class CarRadioScreenshotTest {
     fun homeRetro() = snap(style = UiStyle.RETRO, accent = Accent.GREEN) { homeDriving() }
 
     @Test
+    fun homePortraitCockpit() {
+        paparazzi.unsafeUpdateConfig(DeviceConfig.PIXEL_C.copy(orientation = ScreenOrientation.PORTRAIT))
+        snap(style = UiStyle.COCKPIT) { homeDriving() }
+    }
+
+    @Test
+    fun homePortraitRetro() {
+        paparazzi.unsafeUpdateConfig(DeviceConfig.PIXEL_C.copy(orientation = ScreenOrientation.PORTRAIT))
+        snap(style = UiStyle.RETRO, accent = Accent.ORANGE) { homeDriving() }
+    }
+
+    @Test
+    fun homeGlassNoCar() = snap(style = UiStyle.GLASS, accent = Accent.BLUE) {
+        HomeScreen(
+            widgets = listOf(HomeWidget.CLOCK, HomeWidget.WEATHER, HomeWidget.RADIO),
+            data = WidgetData(
+                LocalDateTime.of(2026, 11, 9, 21, 40), WeatherState.Loading, null, true,
+                favorites = stations.take(6),
+            ),
+            tiles = Fixtures.tiles(),
+            actions = Fixtures.homeActions,
+            modifier = pad,
+        )
+    }
+
+    @Test
     fun gaugesRetro() = snap(style = UiStyle.RETRO, accent = Accent.GREEN) { GaugesScreen(demo, stats(), VehicleProfile(), {}, {}, {}, pad) }
 
     @Composable

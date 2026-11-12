@@ -142,6 +142,7 @@ class PhoneScreenshotTest {
     @Test fun statsBigType() = snap(Tab.STATS, state = styled(UiStyle.BIG_TYPE, Accent.YELLOW))
     @Test fun driveRetro() = snap(Tab.DRIVE, state = styled(UiStyle.RETRO, Accent.GREEN))
     @Test fun statsRetro() = snap(Tab.STATS, state = styled(UiStyle.RETRO, Accent.GREEN))
+    @Test fun driveBigTypeNight() = snap(Tab.DRIVE, night = true, state = styled(UiStyle.BIG_TYPE, Accent.YELLOW))
     @Test fun settingsStyles() = snap(Tab.MORE, more = MorePage.SETTINGS, state = styled(UiStyle.COCKPIT))
 
     private object NoOpRegistryOwner : ActivityResultRegistryOwner {

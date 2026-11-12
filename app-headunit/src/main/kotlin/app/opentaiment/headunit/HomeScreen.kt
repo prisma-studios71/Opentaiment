@@ -22,6 +22,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.opentaiment.core.ui.ActionTile
+import app.opentaiment.core.ui.OtTheme
+import app.opentaiment.core.ui.UiStyle
 import app.opentaiment.core.ui.TileIcon
 import app.opentaiment.headunit.tiles.HomeWidget
 import app.opentaiment.headunit.tiles.WidgetSlots
@@ -46,7 +48,7 @@ class HomeTile(
 private val gap = 20.dp
 
 /**
- * Home screen: three widget slots (two small on the left, one large in the middle – see
+ * Classic home screen: three widget slots (two small on the left, one large in the middle – see
  * [WidgetSlots]) and the tile grid.
  */
 @Composable
@@ -57,6 +59,12 @@ fun HomeScreen(
     actions: HomeActions,
     modifier: Modifier = Modifier,
 ) {
+    // Every style except Classic has its own fixed layout; the widget slots belong to Classic.
+    val style = OtTheme.style.style
+    if (style != UiStyle.CLASSIC) {
+        StyledHomeScreen(style, data, tiles, actions, modifier)
+        return
+    }
     val slot: @Composable (Int, Modifier) -> Unit = { index, m ->
         Box(m) {
             WidgetView(widgets.getOrElse(index) { WidgetSlots.DEFAULT[index] }, data, actions.widgets, Modifier.fillMaxSize())

@@ -101,7 +101,7 @@ fun OtBackground(modifier: Modifier = Modifier, content: @Composable BoxScope.()
                 ),
             )
         }
-        UiStyle.GLASS -> Modifier.background(cs.background).ambientBlobs(cs.primary, companionOf(cs.primary))
+        UiStyle.GLASS -> Modifier.background(cs.background).ambientBlobs(cs.primary, ambientCompanion(cs.primary))
         UiStyle.RETRO -> Modifier.background(Brush.verticalGradient(listOf(lerp(cs.background, Color(0xFF2A2C30), 0.6f), cs.background)))
         else -> Modifier.background(cs.background)
     }
@@ -130,7 +130,7 @@ private fun Modifier.ambientBlobs(first: Color, second: Color): Modifier {
 }
 
 /** A second colour for the Glass background: the accent turned around the colour wheel. */
-private fun companionOf(color: Color): Color {
+fun ambientCompanion(color: Color): Color {
     val hsv = FloatArray(3)
     android.graphics.Color.colorToHSV(color.toArgb(), hsv)
     return Color.hsv((hsv[0] + 300f) % 360f, (hsv[1] + 0.15f).coerceAtMost(1f), hsv[2])
