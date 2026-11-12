@@ -16,7 +16,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
+import app.opentaiment.core.ui.Accent
 import app.opentaiment.core.ui.OpentaimentTheme
+import app.opentaiment.core.ui.OtBackground
+import app.opentaiment.core.ui.UiStyle
 import app.opentaiment.feature.player.LocalTrack
 import app.opentaiment.feature.player.PlaybackKind
 import app.opentaiment.feature.player.PlayerActions
@@ -74,11 +77,16 @@ class CarRadioScreenshotTest {
     private val pad = Modifier.fillMaxSize().padding(20.dp)
     private val demo = ConnectionState.Connected("Tryb demo", demo = true)
 
-    private fun snap(night: Boolean = false, content: @Composable () -> Unit) {
+    private fun snap(
+        night: Boolean = false,
+        style: UiStyle = UiStyle.CLASSIC,
+        accent: Accent = Accent.BLUE,
+        content: @Composable () -> Unit,
+    ) {
         paparazzi.snapshot {
             CompositionLocalProvider(LocalActivityResultRegistryOwner provides NoOpRegistry) {
-                OpentaimentTheme(night = night) {
-                    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) { content() }
+                OpentaimentTheme(accent = accent, night = night, style = style) {
+                    OtBackground(Modifier.fillMaxSize()) { content() }
                 }
             }
         }
@@ -197,7 +205,65 @@ class CarRadioScreenshotTest {
     }
 
     @Test
-    fun homeCarRadio() = snap {
+    fun homeCarRadio() = snap { homeRadio() }
+
+    @Test
+    fun homeCockpit() = snap(style = UiStyle.COCKPIT) { homeDriving() }
+
+    @Test
+    fun homeGlass() = snap(style = UiStyle.GLASS, accent = Accent.PURPLE) { homeRadio() }
+
+    @Test
+    fun homeBigType() = snap(style = UiStyle.BIG_TYPE, accent = Accent.YELLOW) { homeDriving() }
+
+    @Test
+    fun homeRetro() = snap(style = UiStyle.RETRO, accent = Accent.GREEN) { homeDriving() }
+
+    @Test
+    fun homePortraitCockpit() {
+        paparazzi.unsafeUpdateConfig(DeviceConfig.PIXEL_C.copy(orientation = ScreenOrientation.PORTRAIT))
+        snap(style = UiStyle.COCKPIT) { homeDriving() }
+    }
+
+    @Test
+    fun homePortraitRetro() {
+        paparazzi.unsafeUpdateConfig(DeviceConfig.PIXEL_C.copy(orientation = ScreenOrientation.PORTRAIT))
+        snap(style = UiStyle.RETRO, accent = Accent.ORANGE) { homeDriving() }
+    }
+
+    @Test
+    fun homeGlassNoCar() = snap(style = UiStyle.GLASS, accent = Accent.BLUE) {
+        HomeScreen(
+            widgets = listOf(HomeWidget.CLOCK, HomeWidget.WEATHER, HomeWidget.RADIO),
+            data = WidgetData(
+                LocalDateTime.of(2026, 11, 9, 21, 40), WeatherState.Loading, null, true,
+                favorites = stations.take(6),
+            ),
+            tiles = Fixtures.tiles(),
+            actions = Fixtures.homeActions,
+            modifier = pad,
+        )
+    }
+
+    @Test
+    fun gaugesRetro() = snap(style = UiStyle.RETRO, accent = Accent.GREEN) { GaugesScreen(demo, stats(), VehicleProfile(), {}, {}, {}, pad) }
+
+    @Composable
+    private fun homeDriving() = HomeScreen(
+        widgets = listOf(HomeWidget.CLOCK, HomeWidget.CONSUMPTION, HomeWidget.SPEED),
+        data = WidgetData(
+            LocalDateTime.of(2026, 11, 9, 8, 5),
+            WeatherState.Ready(Weather(4.0, 2, 8.0, 1.0, 12.0, false, "Warszawa")),
+            nowPlaying = null, hasMediaAccess = true, connection = demo, stats = stats(),
+            player = playing, favorites = stations.take(6), tpms = tpmsState, tpmsEnabled = true,
+        ),
+        tiles = Fixtures.tiles(),
+        actions = Fixtures.homeActions,
+        modifier = pad,
+    )
+
+    @Composable
+    private fun homeRadio() {
         HomeScreen(
             widgets = listOf(HomeWidget.NAVIGATION, HomeWidget.TPMS, HomeWidget.RADIO),
             data = WidgetData(

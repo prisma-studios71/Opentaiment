@@ -1,5 +1,6 @@
 package app.opentaiment.headunit
 
+import app.opentaiment.core.ui.OtBackground
 import android.Manifest
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -197,7 +198,7 @@ fun OpentaimentApp(viewModel: HomeViewModel) {
         )
     }
 
-    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+    OtBackground(Modifier.fillMaxSize()) {
         val content = Modifier
             .fillMaxSize()
             .windowInsetsPadding(WindowInsets.safeDrawing)

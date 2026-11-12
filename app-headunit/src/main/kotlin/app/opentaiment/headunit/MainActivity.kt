@@ -46,7 +46,7 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(look, car.brightnessControl) {
                 applyNightBrightness(window, if (car.brightnessControl) look.copy(isNight = false) else look)
             }
-            OpentaimentTheme(accent = look.settings.accent, night = look.isNight) {
+            OpentaimentTheme(accent = look.settings.accent, night = look.isNight, style = look.settings.style) {
                 OpentaimentApp(viewModel = viewModel)
             }
         }

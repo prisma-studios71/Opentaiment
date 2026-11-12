@@ -11,6 +11,7 @@ import app.cash.paparazzi.Paparazzi
 import app.opentaiment.core.ui.Accent
 import app.opentaiment.core.ui.AppearanceSettings
 import app.opentaiment.core.ui.OpentaimentTheme
+import app.opentaiment.core.ui.UiStyle
 import app.opentaiment.feature.vehicle.ConnectionState
 import app.opentaiment.feature.vehicle.DiagnosticsState
 import app.opentaiment.feature.vehicle.data.TripCalculator
@@ -96,7 +97,7 @@ class PhoneScreenshotTest {
     ) {
         paparazzi.snapshot {
             CompositionLocalProvider(LocalActivityResultRegistryOwner provides NoOpRegistryOwner) {
-                OpentaimentTheme(accent = state.appearance.accent, night = night) {
+                OpentaimentTheme(accent = state.appearance.accent, night = night, style = state.appearance.style) {
                     PhoneContent(state, actions, initialTab = tab, initialMorePage = more, initialDrivePage = drivePage)
                 }
             }
@@ -130,6 +131,19 @@ class PhoneScreenshotTest {
         Tab.MORE, more = MorePage.SETTINGS,
         state = state(appearance = AppearanceSettings(accent = Accent.GREEN)),
     )
+
+    private fun styled(style: UiStyle, accent: Accent = Accent.BLUE) = state(appearance = AppearanceSettings(style = style, accent = accent))
+
+    @Test fun driveCockpit() = snap(Tab.DRIVE, state = styled(UiStyle.COCKPIT))
+    @Test fun statsCockpit() = snap(Tab.STATS, state = styled(UiStyle.COCKPIT))
+    @Test fun driveGlass() = snap(Tab.DRIVE, state = styled(UiStyle.GLASS, Accent.PURPLE))
+    @Test fun statsGlass() = snap(Tab.STATS, state = styled(UiStyle.GLASS, Accent.PURPLE))
+    @Test fun driveBigType() = snap(Tab.DRIVE, state = styled(UiStyle.BIG_TYPE, Accent.YELLOW))
+    @Test fun statsBigType() = snap(Tab.STATS, state = styled(UiStyle.BIG_TYPE, Accent.YELLOW))
+    @Test fun driveRetro() = snap(Tab.DRIVE, state = styled(UiStyle.RETRO, Accent.GREEN))
+    @Test fun statsRetro() = snap(Tab.STATS, state = styled(UiStyle.RETRO, Accent.GREEN))
+    @Test fun driveBigTypeNight() = snap(Tab.DRIVE, night = true, state = styled(UiStyle.BIG_TYPE, Accent.YELLOW))
+    @Test fun settingsStyles() = snap(Tab.MORE, more = MorePage.SETTINGS, state = styled(UiStyle.COCKPIT))
 
     private object NoOpRegistryOwner : ActivityResultRegistryOwner {
         override val activityResultRegistry = object : ActivityResultRegistry() {

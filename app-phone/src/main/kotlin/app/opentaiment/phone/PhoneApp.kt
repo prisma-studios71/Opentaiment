@@ -1,5 +1,17 @@
 package app.opentaiment.phone
 
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.border
+import androidx.compose.foundation.background
+import app.opentaiment.core.ui.UiStyle
+import app.opentaiment.core.ui.HardwareKey
+import androidx.compose.ui.graphics.Color
+import app.opentaiment.core.ui.OtTheme
+import app.opentaiment.core.ui.OtBackground
 import android.content.Intent
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
@@ -43,6 +55,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.opentaiment.core.ui.AppearanceController
 import app.opentaiment.core.ui.AppearanceSettings
@@ -173,21 +186,14 @@ fun PhoneContent(
     var more by rememberSaveable { mutableStateOf(initialMorePage) }
     BackHandler(enabled = tab == Tab.MORE && more != MorePage.MENU) { more = MorePage.MENU }
 
+    OtBackground(Modifier.fillMaxSize()) {
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = Color.Transparent,
+        contentColor = MaterialTheme.colorScheme.onBackground,
         bottomBar = {
-            NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
-                Tab.entries.forEach { t ->
-                    NavigationBarItem(
-                        selected = t == tab,
-                        onClick = {
-                            tab = t
-                            if (t == Tab.MORE) more = MorePage.MENU
-                        },
-                        icon = { Icon(t.icon, contentDescription = null) },
-                        label = { Text(t.label) },
-                    )
-                }
+            PhoneBottomBar(tab) { t ->
+                tab = t
+                if (t == Tab.MORE) more = MorePage.MENU
             }
         },
     ) { padding ->
@@ -213,6 +219,88 @@ fun PhoneContent(
                     state.appearance, actions.onAppearanceChange, state.profile, actions.onProfileChange,
                     onBack = { more = MorePage.MENU }, modifier = content,
                 )
+            }
+        }
+    }
+    }
+}
+
+/** Bottom navigation drawn in the current style: Material bar, cockpit strip, glass pill, boxes or hardware keys. */
+@Composable
+private fun PhoneBottomBar(selected: Tab, onSelect: (Tab) -> Unit) {
+    val style = OtTheme.style
+    val cs = MaterialTheme.colorScheme
+    val label: @Composable (Tab, Color) -> Unit = { t, c ->
+        Text(t.label, color = c, style = MaterialTheme.typography.labelMedium, maxLines = 1, softWrap = false, letterSpacing = 0.sp)
+    }
+    when (style.style) {
+        UiStyle.CLASSIC -> NavigationBar(containerColor = style.barColor) {
+            Tab.entries.forEach { t ->
+                NavigationBarItem(
+                    selected = t == selected, onClick = { onSelect(t) },
+                    icon = { Icon(t.icon, contentDescription = null) },
+                    label = { Text(t.label, maxLines = 1, softWrap = false, letterSpacing = 0.sp) },
+                )
+            }
+        }
+        UiStyle.COCKPIT -> Column(Modifier.background(style.barColor).navigationBarsPadding()) {
+            Box(Modifier.fillMaxWidth().height(1.dp).background(cs.outline))
+            Row(Modifier.fillMaxWidth().height(68.dp)) {
+                Tab.entries.forEach { t ->
+                    val c = if (t == selected) cs.primary else cs.onSurfaceVariant
+                    Column(
+                        Modifier.weight(1f).fillMaxHeight().clickable { onSelect(t) },
+                        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
+                    ) {
+                        Box(Modifier.width(24.dp).height(2.dp).background(if (t == selected) cs.primary else Color.Transparent))
+                        Spacer(Modifier.height(8.dp))
+                        Icon(t.icon, null, tint = c)
+                        label(t, c)
+                    }
+                }
+            }
+        }
+        UiStyle.GLASS -> Row(
+            Modifier.navigationBarsPadding().padding(horizontal = 16.dp, vertical = 10.dp).fillMaxWidth().height(68.dp)
+                .clip(RoundedCornerShape(24.dp)).background(style.barColor).border(1.dp, cs.outline, RoundedCornerShape(24.dp)),
+        ) {
+            Tab.entries.forEach { t ->
+                val on = t == selected
+                Column(
+                    Modifier.weight(1f).fillMaxHeight().padding(6.dp).clip(RoundedCornerShape(18.dp))
+                        .background(if (on) Color.White.copy(alpha = 0.16f) else Color.Transparent).clickable { onSelect(t) },
+                    horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
+                ) {
+                    val c = if (on) Color.White else Color.White.copy(alpha = 0.6f)
+                    Icon(t.icon, null, tint = c)
+                    label(t, c)
+                }
+            }
+        }
+        UiStyle.BIG_TYPE -> Row(
+            Modifier.background(cs.background).navigationBarsPadding().padding(8.dp).fillMaxWidth().height(56.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Tab.entries.forEach { t ->
+                val on = t == selected
+                Box(
+                    Modifier.weight(1f).fillMaxHeight().border(3.dp, cs.onSurface)
+                        .background(if (on) cs.onSurface else Color.Transparent).clickable { onSelect(t) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        t.label.take(6), color = if (on) cs.background else cs.onSurface,
+                        style = MaterialTheme.typography.labelLarge, maxLines = 1, softWrap = false, letterSpacing = 0.sp,
+                    )
+                }
+            }
+        }
+        UiStyle.RETRO -> Row(
+            Modifier.background(style.barColor).navigationBarsPadding().padding(10.dp).fillMaxWidth().height(64.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Tab.entries.forEach { t ->
+                HardwareKey(t.label.take(6), { onSelect(t) }, Modifier.weight(1f).fillMaxHeight(), active = t == selected, textStyle = MaterialTheme.typography.titleSmall)
             }
         }
     }

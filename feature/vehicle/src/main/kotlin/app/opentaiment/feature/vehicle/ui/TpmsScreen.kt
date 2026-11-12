@@ -1,5 +1,6 @@
 package app.opentaiment.feature.vehicle.ui
 
+import app.opentaiment.core.ui.OtNumber
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -173,7 +174,7 @@ private fun WheelCard(status: WheelStatus, limits: TpmsLimits, onForget: () -> U
         }
         Spacer(Modifier.weight(1f))
         Row(verticalAlignment = Alignment.Bottom) {
-            Text(r?.pressureBar.fmt(1), fontSize = 56.sp, fontWeight = FontWeight.Light, color = color)
+            OtNumber(r?.pressureBar.fmt(1), 56.sp, color = color)
             Spacer(Modifier.width(6.dp))
             Text("bar", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }

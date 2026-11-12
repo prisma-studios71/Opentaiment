@@ -21,7 +21,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.Button
@@ -52,6 +56,7 @@ enum class NightMode(val label: String) {
 }
 
 data class AppearanceSettings(
+    val style: UiStyle = UiStyle.CLASSIC,
     val accent: Accent = Accent.BLUE,
     val nightMode: NightMode = NightMode.AUTO,
     val dimAtNight: Boolean = true,
@@ -84,6 +89,7 @@ class AppearanceController(context: Context, private val scope: CoroutineScope) 
 
     fun update(settings: AppearanceSettings) {
         prefs.edit {
+            putString(KEY_STYLE, settings.style.name)
             putString(KEY_ACCENT, settings.accent.name)
             putString(KEY_NIGHT, settings.nightMode.name)
             putBoolean(KEY_DIM, settings.dimAtNight)
@@ -122,12 +128,14 @@ class AppearanceController(context: Context, private val scope: CoroutineScope) 
     }
 
     private fun load() = AppearanceSettings(
+        style = prefs.getString(KEY_STYLE, null)?.let { n -> UiStyle.entries.firstOrNull { it.name == n } } ?: UiStyle.CLASSIC,
         accent = prefs.getString(KEY_ACCENT, null)?.let { n -> Accent.entries.firstOrNull { it.name == n } } ?: Accent.BLUE,
         nightMode = prefs.getString(KEY_NIGHT, null)?.let { n -> NightMode.entries.firstOrNull { it.name == n } } ?: NightMode.AUTO,
         dimAtNight = prefs.getBoolean(KEY_DIM, true),
     )
 
     private companion object {
+        const val KEY_STYLE = "style"
         const val KEY_ACCENT = "accent"
         const val KEY_NIGHT = "night"
         const val KEY_DIM = "dim"
@@ -142,11 +150,25 @@ fun applyNightBrightness(window: Window, state: AppearanceState) {
     window.attributes = attrs
 }
 
-/** Settings block: accent colour, night mode and dimming. */
+/** Settings block: interface style, accent colour, night mode and dimming. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AppearanceSettingsSection(settings: AppearanceSettings, onChange: (AppearanceSettings) -> Unit, modifier: Modifier = Modifier) {
     Column(modifier) {
+        Text("Styl interfejsu", style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(12.dp))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            UiStyle.entries.forEach { style ->
+                StylePreview(style, settings.accent, selected = style == settings.style) { onChange(settings.copy(style = style)) }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            settings.style.description,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(24.dp))
         Text("Kolor akcentu", style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(12.dp))
         FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -184,6 +206,41 @@ fun AppearanceSettingsSection(settings: AppearanceSettings, onChange: (Appearanc
             Text("Przyciemniaj ekran w nocy", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
             Spacer(Modifier.width(12.dp))
             Switch(checked = settings.dimAtNight, onCheckedChange = { onChange(settings.copy(dimAtNight = it)) })
+        }
+    }
+}
+
+/** A small live sample of a style: its background, a card and a big number, drawn by that style's own theme. */
+@Composable
+private fun StylePreview(style: UiStyle, accent: Accent, selected: Boolean, onClick: () -> Unit) {
+    val frame = RoundedCornerShape(18.dp)
+    Column(Modifier.width(156.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            Modifier.size(156.dp, 108.dp).clip(frame)
+                .border(
+                    if (selected) 3.dp else 1.dp,
+                    if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                    frame,
+                )
+                .clickable(onClickLabel = style.label, onClick = onClick),
+        ) {
+            OpentaimentTheme(accent = accent, style = style) {
+                OtBackground(Modifier.fillMaxSize().padding(10.dp)) {
+                    OtCard(Modifier.fillMaxSize(), padding = 10.dp) {
+                        Text("km/h", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, maxLines = 1)
+                        Spacer(Modifier.weight(1f))
+                        OtNumber("63", 40.sp)
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (selected) {
+                Icon(Icons.Rounded.Check, contentDescription = null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(4.dp))
+            }
+            Text(style.label, style = MaterialTheme.typography.titleMedium, maxLines = 1)
         }
     }
 }

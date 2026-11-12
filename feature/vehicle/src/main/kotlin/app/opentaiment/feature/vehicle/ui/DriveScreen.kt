@@ -1,5 +1,6 @@
 package app.opentaiment.feature.vehicle.ui
 
+import app.opentaiment.core.ui.OtNumber
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -27,6 +28,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.opentaiment.core.ui.OtTheme
+import app.opentaiment.core.ui.UiStyle
 import app.opentaiment.feature.vehicle.ConnectionState
 import app.opentaiment.feature.vehicle.data.VehicleStats
 
@@ -49,11 +52,12 @@ fun DriveScreen(
         return
     }
     val pager = rememberPagerState(initialPage = initialPage) { PAGES }
+    val style = OtTheme.style.style
     Column(modifier) {
         AlertBanner(stats.alerts, Modifier.padding(bottom = 12.dp))
         HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth()) { page ->
             when (page) {
-                0 -> BigPage(
+                0 -> if (style != UiStyle.CLASSIC) StyledSpeedPage(style, stats) else BigPage(
                     value = stats.speedKmh.fmt(), unit = "km/h",
                     left = stats.instantLPer100Km?.let { Side("Spalanie teraz", it.fmt(1), "l/100 km") }
                         ?: Side("Spalanie teraz", stats.fuelRateLh.fmt(1), "l/h"),
@@ -115,14 +119,14 @@ private fun BigPage(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(value, fontSize = if (narrow) 120.sp else 150.sp, fontWeight = FontWeight.Light, color = valueColor, maxLines = 1)
+        OtNumber(value, if (narrow) 120.sp else 150.sp, color = valueColor)
         Text(unit, style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(32.dp))
         Row(Modifier.fillMaxWidth()) {
             listOf(left, right).forEach { side ->
                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(side.label, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
-                    Text(side.value, fontSize = if (narrow) 44.sp else 56.sp, fontWeight = FontWeight.Light, maxLines = 1)
+                    OtNumber(side.value, if (narrow) 44.sp else 56.sp)
                     Text(side.unit, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }

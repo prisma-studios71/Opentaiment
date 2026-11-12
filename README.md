@@ -122,8 +122,9 @@ serwis, głośność zależna od prędkości i reakcja na zapłon.
 <td valign="top">
 
 #### 🎨 Wygląd i wygoda
+- **5 stylów interfejsu**: Klasyczny, Cockpit, Glass, Big type, Retro VFD
 - **Automatyczny tryb nocny** od zachodu słońca
-- 6 kolorów akcentu
+- 7 kolorów akcentu
 - Ekran „Jazda” – jedna wielka liczba
 - Widżety i kafelki do ułożenia po swojemu
 - Adaptery **OBD na BLE**, samo-reconnect
@@ -142,6 +143,40 @@ serwis, głośność zależna od prędkości i reakcja na zapłon.
 <br>
 <sub>Eco-score · Tryb nocny · Ostrzeżenie · Wyścig · Ustawienia · Więcej</sub>
 </div>
+
+## 🎨 Style interfejsu
+
+W **Ustawienia → Wygląd** wybierasz styl całej apki. Styl to nie tylko kolory: **ekran główny radia, ekran „Jazda” na telefonie
+i dolny pasek mają w każdym stylu inny układ**. Reszta ekranów (statystyki, błędy, trasy…) zmienia fonty, karty i liczby.
+Kolor akcentu działa we wszystkich stylach, a w Retro VFD to kolor świecenia wyświetlacza. Tryb nocny jest wszędzie ten sam, czerwono-czarny.
+
+| Styl | Ekran główny radia | Jazda na telefonie |
+|---|---|---|
+| **Klasyczny** | Trzy widżety do wyboru i siatka kafelków | Jedna wielka liczba |
+| **Cockpit** | Wielki zegar z łukiem w kolorze eco-score, obok „teraz gra” i opony na sylwetce auta, na dole dock | Zegar z prędkością w środku, spalanie, pasek obrotów |
+| **Glass** | Duży odtwarzacz z okładką i ulubionymi stacjami, obok szklane karty: prędkość, dom, pogoda, opony | Cienka liczba na poświacie, która z zielonej robi się czerwona, gdy jedziesz ostro |
+| **Big type** | Bloki: żółta prędkość z miernikiem eco, spalanie, opony, radio z przyciskami tekstowymi | Żółta płyta z prędkością i dwa bloki spalania |
+| **Retro VFD** | Pasek stacji z zegarem segmentowym, prędkość na 7 segmentach, analizator widma, fizyczne przyciski z diodami | Jeden panel VFD: prędkość, obroty, spalanie na bursztynowo, eco w kratkach |
+
+W stylach innych niż Klasyczny kafelki ekranu głównego stają się dockiem albo przyciskami (przytrzymaj, żeby je edytować),
+a widżety do wyboru są tylko w stylu Klasycznym.
+
+<div align="center">
+<img src="app-phone/src/test/snapshots/images/app.opentaiment.phone_PhoneScreenshotTest_driveCockpit.png" width="19%" alt="Cockpit">&nbsp;
+<img src="app-phone/src/test/snapshots/images/app.opentaiment.phone_PhoneScreenshotTest_driveGlass.png" width="19%" alt="Glass">&nbsp;
+<img src="app-phone/src/test/snapshots/images/app.opentaiment.phone_PhoneScreenshotTest_driveBigType.png" width="19%" alt="Big type">&nbsp;
+<img src="app-phone/src/test/snapshots/images/app.opentaiment.phone_PhoneScreenshotTest_driveRetro.png" width="19%" alt="Retro VFD">
+<br>
+<sub>Cockpit · Glass · Big type · Retro VFD</sub>
+<br><br>
+<img src="app-headunit/src/test/snapshots/images/app.opentaiment.headunit_CarRadioScreenshotTest_homeCockpit.png" width="49%" alt="Cockpit na radiu">&nbsp;
+<img src="app-headunit/src/test/snapshots/images/app.opentaiment.headunit_CarRadioScreenshotTest_homeGlass.png" width="49%" alt="Glass na radiu">
+<br>
+<img src="app-headunit/src/test/snapshots/images/app.opentaiment.headunit_CarRadioScreenshotTest_homeBigType.png" width="49%" alt="Big type na radiu">&nbsp;
+<img src="app-headunit/src/test/snapshots/images/app.opentaiment.headunit_CarRadioScreenshotTest_homeRetro.png" width="49%" alt="Retro VFD na radiu">
+</div>
+
+Ekranów w Android Auto style nie zmieniają, bo te rysuje sam Android Auto z szablonów Google.
 
 ## 🚗 Jak to działa z Android Auto
 
@@ -280,7 +315,7 @@ app-phone/        📱 telefon: zakładki, usługa w tle, powiadomienia
 car/              🚗 ekrany Android Auto (Car App Library 1.7)
 app-headunit/     📻 radio / tablet: launcher, usługa w tle, zapłon,
                      kierownica, głośność, jasność, dymek
-core/ui/          🎨 motywy, tryb nocny, komponenty
+core/ui/          🎨 style UI, motywy, tryb nocny, komponenty, fonty
 feature/vehicle/  🔌 OBD-II (ELM327 BT/BLE), obliczenia, trasy + GPS,
                      alerty, TPMS, serwis, wyścig, ekrany Compose
 feature/player/   🎵 radio internetowe i pliki (Media3)

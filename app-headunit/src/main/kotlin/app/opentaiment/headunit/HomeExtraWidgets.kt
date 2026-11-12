@@ -1,5 +1,6 @@
 package app.opentaiment.headunit
 
+import app.opentaiment.core.ui.OtNumber
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -176,7 +177,7 @@ internal fun TpmsWidget(data: WidgetData, actions: WidgetActions, modifier: Modi
                             verticalArrangement = Arrangement.Center,
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
-                            Text(reading?.pressureBar?.let { String.format(PL, "%.1f", it) } ?: "—", fontSize = 30.sp, fontWeight = FontWeight.Light, color = color)
+                            OtNumber(reading?.pressureBar?.let { String.format(PL, "%.1f", it) } ?: "—", 30.sp, color = color)
                             Text(w.short, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }

@@ -1,5 +1,6 @@
 package app.opentaiment.feature.vehicle.ui
 
+import app.opentaiment.core.ui.OtNumber
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -45,7 +46,7 @@ private fun CardTitle(text: String) {
 @Composable
 private fun BigValue(value: String, unit: String, modifier: Modifier = Modifier) {
     Row(modifier, verticalAlignment = Alignment.Bottom) {
-        Text(value, style = MaterialTheme.typography.displayMedium, maxLines = 1)
+        OtNumber(value, 56.sp)
         Spacer(Modifier.width(8.dp))
         Text(
             unit, style = MaterialTheme.typography.titleMedium,
@@ -209,10 +210,9 @@ fun SprintCard(stats: VehicleStats, modifier: Modifier = Modifier) {
                         )
                     }
                     val running = sprint.runningSec
-                    Text(
-                        text = (running ?: sprint.lastSec)?.let { "${it.fmt(1)} s" } ?: NO_VALUE,
-                        fontSize = 40.sp,
-                        fontWeight = FontWeight.Light,
+                    OtNumber(
+                        (running ?: sprint.lastSec)?.let { "${it.fmt(1)} s" } ?: NO_VALUE,
+                        40.sp,
                         color = if (running != null) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurface,
                     )
                 }
