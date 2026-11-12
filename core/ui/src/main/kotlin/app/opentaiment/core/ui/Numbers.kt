@@ -108,6 +108,8 @@ internal object SevenSegment {
         '0' to "abcdef", '1' to "bc", '2' to "abged", '3' to "abgcd", '4' to "fgbc",
         '5' to "afgcd", '6' to "afgedc", '7' to "abc", '8' to "abcdefg", '9' to "abcdfg",
         ' ' to "", '-' to "g", '—' to "g", '–' to "g",
+        // Thousands separators from Polish number formatting: a narrow gap, nothing lit.
+        '\u00A0' to "", '\u202F' to "",
     )
 
     fun canDraw(text: String) =
@@ -116,6 +118,7 @@ internal object SevenSegment {
     private fun advance(c: Char) = when (c) {
         ':' -> 22f
         '.', ',' -> 8f
+        '\u00A0', '\u202F' -> 30f
         else -> 70f
     }
 
@@ -135,6 +138,7 @@ internal object SevenSegment {
             when (c) {
                 ':' -> { dot(x + 6f, 32f); dot(x + 6f, 68f) }
                 '.', ',' -> dot(x - 6f, 95f)
+                '\u00A0', '\u202F' -> Unit
                 else -> {
                     val lit = digits[c].orEmpty()
                     segments.forEach { (name, r) ->

@@ -46,6 +46,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.opentaiment.core.ui.AppearanceController
 import app.opentaiment.core.ui.AppearanceSettings
@@ -190,7 +191,7 @@ fun PhoneContent(
                             if (t == Tab.MORE) more = MorePage.MENU
                         },
                         icon = { Icon(t.icon, contentDescription = null) },
-                        label = { Text(t.label) },
+                        label = { Text(t.label, maxLines = 1, softWrap = false, letterSpacing = 0.sp) },
                     )
                 }
             }
