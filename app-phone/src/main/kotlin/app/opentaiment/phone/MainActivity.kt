@@ -30,7 +30,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val look by appearance.state.collectAsStateWithLifecycle()
             LaunchedEffect(look) { applyNightBrightness(window, look) }
-            OpentaimentTheme(accent = look.settings.accent, night = look.isNight) {
+            OpentaimentTheme(accent = look.settings.accent, night = look.isNight, style = look.settings.style) {
                 PhoneApp(appearance)
             }
         }

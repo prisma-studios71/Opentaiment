@@ -1,5 +1,6 @@
 package app.opentaiment.headunit
 
+import app.opentaiment.core.ui.OtNumber
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -215,12 +216,7 @@ internal fun ClockCard(now: LocalDateTime, modifier: Modifier = Modifier) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val big = maxHeight > 380.dp
             Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center) {
-                Text(
-                    now.format(timeFormat),
-                    style = MaterialTheme.typography.displayLarge,
-                    fontSize = if (big) 150.sp else MaterialTheme.typography.displayLarge.fontSize,
-                    maxLines = 1,
-                )
+                OtNumber(now.format(timeFormat), if (big) 150.sp else 88.sp)
                 Text(
                     now.format(dateFormat).replaceFirstChar { it.titlecase(PL) },
                     style = MaterialTheme.typography.titleLarge,
@@ -257,7 +253,7 @@ private fun MetricCard(
                 Text(title, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.weight(1f))
                 Row(verticalAlignment = Alignment.Bottom) {
-                    Text(value, fontSize = valueSize, fontWeight = FontWeight.Light, color = valueColor, maxLines = 1)
+                    OtNumber(value, valueSize, color = valueColor)
                     if (unit.isNotEmpty()) {
                         Spacer(Modifier.width(8.dp))
                         Text(

@@ -1,5 +1,6 @@
 package app.opentaiment.feature.vehicle.ui
 
+import app.opentaiment.core.ui.OtNumber
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -172,7 +173,7 @@ fun Gauge(spec: GaugeSpec, value: Double?, modifier: Modifier = Modifier) {
                     val big = (maxWidth.value * 0.17f).coerceIn(18f, 64f)
                     val bottomGap = (maxHeight.value * 0.04f).dp
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(value.fmt(spec.decimals), fontSize = big.sp, fontWeight = FontWeight.Light, maxLines = 1)
+                        OtNumber(value.fmt(spec.decimals), big.sp)
                         Text(spec.unit, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.height(bottomGap))
                     }

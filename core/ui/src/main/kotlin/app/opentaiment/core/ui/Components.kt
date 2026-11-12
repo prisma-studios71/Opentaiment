@@ -1,6 +1,25 @@
 package app.opentaiment.core.ui
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -36,17 +55,85 @@ val OtCardShape = RoundedCornerShape(28.dp)
 fun OtCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
+    padding: Dp = OtTheme.style.cardPadding,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    val style = OtTheme.style
+    val colors = CardDefaults.cardColors(containerColor = style.cardColor, contentColor = MaterialTheme.colorScheme.onSurface)
     val inner: @Composable () -> Unit = {
-        Column(Modifier.fillMaxSize().padding(24.dp), content = content)
+        Column(Modifier.fillMaxSize().vfdLines(style.scanlines).padding(padding), content = content)
     }
     if (onClick != null) {
-        Card(onClick = onClick, modifier = modifier, shape = OtCardShape, colors = colors) { inner() }
+        Card(onClick = onClick, modifier = modifier, shape = style.cardShape, colors = colors, border = style.cardBorder) { inner() }
     } else {
-        Card(modifier = modifier, shape = OtCardShape, colors = colors) { inner() }
+        Card(modifier = modifier, shape = style.cardShape, colors = colors, border = style.cardBorder) { inner() }
     }
+}
+
+/** Faint horizontal lines over the content, like the mesh in front of a vacuum-fluorescent display. */
+private fun Modifier.vfdLines(enabled: Boolean): Modifier = if (!enabled) this else drawWithContent {
+    drawContent()
+    val step = 3.dp.toPx()
+    val line = Color.Black.copy(alpha = 0.22f)
+    var y = 0f
+    while (y < size.height) {
+        drawLine(line, Offset(0f, y), Offset(size.width, y), strokeWidth = 1f)
+        y += step
+    }
+}
+
+/**
+ * Full-screen background in the current [UiStyle]: plain, a soft light behind the gauges (Cockpit),
+ * slowly drifting colour blobs (Glass) or a dark bezel gradient (Retro).
+ */
+@Composable
+fun OtBackground(modifier: Modifier = Modifier, content: @Composable BoxScope.() -> Unit) {
+    val style = OtTheme.style.style
+    val cs = MaterialTheme.colorScheme
+    val paint = when (style) {
+        UiStyle.COCKPIT -> Modifier.background(cs.background).drawBehind {
+            val light = lerp(cs.background, cs.primary, 0.08f)
+            drawRect(
+                Brush.radialGradient(
+                    listOf(light, Color.Transparent),
+                    center = Offset(size.width * 0.3f, size.height * 0.4f),
+                    radius = size.maxDimension * 0.7f,
+                ),
+            )
+        }
+        UiStyle.GLASS -> Modifier.background(cs.background).ambientBlobs(cs.primary, companionOf(cs.primary))
+        UiStyle.RETRO -> Modifier.background(Brush.verticalGradient(listOf(lerp(cs.background, Color(0xFF2A2C30), 0.6f), cs.background)))
+        else -> Modifier.background(cs.background)
+    }
+    Box(modifier.then(paint)) {
+        CompositionLocalProvider(LocalContentColor provides cs.onBackground) { content() }
+    }
+}
+
+@Composable
+private fun Modifier.ambientBlobs(first: Color, second: Color): Modifier {
+    val drift by rememberInfiniteTransition(label = "ambient").animateFloat(
+        initialValue = 0f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(durationMillis = 20_000, easing = LinearEasing), RepeatMode.Reverse),
+        label = "drift",
+    )
+    return drawBehind {
+        val r = size.maxDimension
+        fun blob(color: Color, x: Float, y: Float, radius: Float, alpha: Float) {
+            val c = Offset(x, y)
+            drawCircle(Brush.radialGradient(listOf(color.copy(alpha = alpha), Color.Transparent), center = c, radius = radius), radius, c)
+        }
+        blob(first, size.width * (0.08f + 0.14f * drift), size.height * (0.1f + 0.12f * drift), r * 0.62f, 0.55f)
+        blob(second, size.width * (0.96f - 0.12f * drift), size.height * (0.95f - 0.14f * drift), r * 0.55f, 0.5f)
+        blob(lerp(first, second, 0.5f), size.width * (0.48f + 0.06f * drift), size.height * 0.45f, r * 0.34f, 0.22f)
+    }
+}
+
+/** A second colour for the Glass background: the accent turned around the colour wheel. */
+private fun companionOf(color: Color): Color {
+    val hsv = FloatArray(3)
+    android.graphics.Color.colorToHSV(color.toArgb(), hsv)
+    return Color.hsv((hsv[0] + 300f) % 360f, (hsv[1] + 0.15f).coerceAtMost(1f), hsv[2])
 }
 
 /** Icon of a tile: a vector from the icon set, or another app's launcher icon. */
@@ -74,10 +161,12 @@ fun ActionTile(
     subtitle: String? = null,
     onLongClick: (() -> Unit)? = null,
 ) {
+    val style = OtTheme.style
     Card(
-        modifier = modifier.clip(OtCardShape).combinedClickable(onClick = onClick, onLongClick = onLongClick),
-        shape = OtCardShape,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        modifier = modifier.clip(style.cardShape).combinedClickable(onClick = onClick, onLongClick = onLongClick),
+        shape = style.cardShape,
+        colors = CardDefaults.cardColors(containerColor = style.cardColor, contentColor = MaterialTheme.colorScheme.onSurface),
+        border = style.cardBorder,
     ) {
         Column(
             Modifier.fillMaxSize().padding(12.dp),

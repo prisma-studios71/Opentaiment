@@ -1,5 +1,8 @@
 package app.opentaiment.phone
 
+import androidx.compose.ui.graphics.Color
+import app.opentaiment.core.ui.OtTheme
+import app.opentaiment.core.ui.OtBackground
 import android.content.Intent
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
@@ -173,10 +176,12 @@ fun PhoneContent(
     var more by rememberSaveable { mutableStateOf(initialMorePage) }
     BackHandler(enabled = tab == Tab.MORE && more != MorePage.MENU) { more = MorePage.MENU }
 
+    OtBackground(Modifier.fillMaxSize()) {
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = Color.Transparent,
+        contentColor = MaterialTheme.colorScheme.onBackground,
         bottomBar = {
-            NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
+            NavigationBar(containerColor = OtTheme.style.barColor) {
                 Tab.entries.forEach { t ->
                     NavigationBarItem(
                         selected = t == tab,
@@ -215,6 +220,7 @@ fun PhoneContent(
                 )
             }
         }
+    }
     }
 }
 

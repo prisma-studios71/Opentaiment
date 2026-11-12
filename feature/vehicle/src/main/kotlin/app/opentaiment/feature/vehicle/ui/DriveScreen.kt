@@ -1,5 +1,6 @@
 package app.opentaiment.feature.vehicle.ui
 
+import app.opentaiment.core.ui.OtNumber
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -115,14 +116,14 @@ private fun BigPage(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(value, fontSize = if (narrow) 120.sp else 150.sp, fontWeight = FontWeight.Light, color = valueColor, maxLines = 1)
+        OtNumber(value, if (narrow) 120.sp else 150.sp, color = valueColor)
         Text(unit, style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(32.dp))
         Row(Modifier.fillMaxWidth()) {
             listOf(left, right).forEach { side ->
                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(side.label, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
-                    Text(side.value, fontSize = if (narrow) 44.sp else 56.sp, fontWeight = FontWeight.Light, maxLines = 1)
+                    OtNumber(side.value, if (narrow) 44.sp else 56.sp)
                     Text(side.unit, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }

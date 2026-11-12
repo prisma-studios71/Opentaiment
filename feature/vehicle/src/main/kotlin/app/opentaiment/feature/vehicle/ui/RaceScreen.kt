@@ -1,5 +1,6 @@
 package app.opentaiment.feature.vehicle.ui
 
+import app.opentaiment.core.ui.OtNumber
 import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -149,10 +150,9 @@ private fun LapsCard(race: RaceState, modifier: Modifier) {
                 modifier = Modifier.padding(top = 8.dp),
             )
             else -> {
-                Text(
+                OtNumber(
                     race.currentLapSec?.let { formatLap(it, decimals = 1) } ?: "czekam na start…",
-                    fontSize = 56.sp,
-                    fontWeight = FontWeight.Light,
+                    56.sp,
                     color = MaterialTheme.colorScheme.secondary,
                 )
                 MetricLine("Najlepsze", race.bestLapSec?.let { formatLap(it) } ?: NO_VALUE)
